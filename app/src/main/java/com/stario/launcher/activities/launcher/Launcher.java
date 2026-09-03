@@ -44,6 +44,7 @@ import com.stario.launcher.activities.launcher.widgets.ClockWidget;
 import com.stario.launcher.activities.launcher.widgets.SearchWidget;
 import com.stario.launcher.activities.launcher.widgets.glance.Glance;
 import com.stario.launcher.activities.launcher.widgets.glance.GlanceDialogExtension;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.calendar.Calendar;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.Media;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
@@ -88,6 +89,7 @@ public class Launcher extends ThemedActivity {
     private View navBarContrast;
     private View decorView;
     private SharedPreferences pinnedCategoryPreferences;
+    private GlanceQuickApps quickApps;
     private Gestures gestures;
     private Glance glance;
 
@@ -284,6 +286,15 @@ public class Launcher extends ThemedActivity {
     private void attachGlance(DynamicGridLayout container) {
         glance = new Glance(this);
         glance.attach(container);
+
+        quickApps = new GlanceQuickApps(this);
+        glance.setOnLongPressListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            quickApps.toggle(v);
+
+            return true;
+        });
 
         GlanceDialogExtension.TransitionListener listener =
                 slideOffset -> animateSheet(slideOffset, false, false);

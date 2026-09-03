@@ -42,6 +42,7 @@ public class Glance {
     private final ArrayList<GlanceExtension> extensions;
     private final ThemedActivity activity;
 
+    private View.OnLongClickListener longPressListener;
     private LinearLayout extensionContainer;
     private GlanceConstraintLayout root;
 
@@ -101,9 +102,22 @@ public class Glance {
                     if (additionalClickListener != null) {
                         additionalClickListener.onClick(view1);
                     }
-                }));
+                },
+                longPressListener != null ? (view1) -> longPressListener.onLongClick(root) : null,
+                null));
 
         extensions.add(extension);
+    }
+
+    /**
+     * Invoked when the user long-presses anywhere on the Glance card
+     * (the day/weather widget), regardless of which inline extension chip
+     * (calendar, weather, media, ...) happens to be underneath the finger.
+     * Must be set before {@link #attachViewExtension} / {@link #attachDialogExtension}
+     * are called for it to apply to every chip.
+     */
+    public void setOnLongPressListener(View.OnLongClickListener listener) {
+        this.longPressListener = listener;
     }
 
     public void attachViewExtension(GlanceViewExtension extension) {
