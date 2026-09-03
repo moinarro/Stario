@@ -22,6 +22,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -178,7 +179,38 @@ public class GlanceQuickApps {
         content.setScaleY(0.85f);
         content.setPivotY(0f);
 
-        popupWindow.showAsDropDown(anchor, 0, Measurements.dpToPx(8));
+        // showAsDropDown() leaves it to the platform to decide whether the popup
+        // fits below the anchor, and on several OEM builds that logic pushes an
+        // oversized/undersized-measured WRAP_CONTENT popup all the way to the
+        // bottom of the screen instead of flipping it above the anchor, making it
+        // land off-screen. Position it ourselves against the anchor's actual
+        // on-screen location, measured up-front, and flip above the anchor when
+        // there isn't enough room below.
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        content.measure(widthSpec, heightSpec);
+        int popupHeight = content.getMeasuredHeight();
+
+        int[] anchorLocation = new int[2];
+        anchor.getLocationOnScreen(anchorLocation);
+
+        int margin = (int) Measurements.dpToPx(8);
+        int screenHeight = Measurements.getHeight();
+
+        int spaceBelow = screenHeight - (anchorLocation[1] + anchor.getHeight());
+
+        int x = anchorLocation[0];
+        int y;
+
+        if (spaceBelow >= popupHeight + margin) {
+            y = anchorLocation[1] + anchor.getHeight() + margin;
+            content.setPivotY(0f);
+        } else {
+            y = Math.max(0, anchorLocation[1] - popupHeight - margin);
+            content.setPivotY(popupHeight);
+        }
+
+        popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y);
 
         content.animate()
                 .alpha(1f)
