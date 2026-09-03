@@ -73,6 +73,21 @@ public class Glance {
 
         gridItem.addView(root);
 
+        // The extension chips (calendar, weather preview, media preview) each get
+        // their own long-press handling in attachViewExtension(), but a large part
+        // of the card's surface is just its background (the padding around the
+        // chips, and any empty space beside them) which belongs to root itself.
+        // Without a listener here, a long-press there falls straight through to
+        // SheetsFocusController's own long-press handling (the launcher options
+        // menu) instead of opening the quick-apps popup. This listener is
+        // evaluated lazily against the longPressListener field so it works
+        // whether setOnLongPressListener() is called before or after attach().
+        root.setHapticFeedbackEnabled(false);
+        root.setOnTouchListener(SheetsFocusController.createClickTouchListener(
+                null,
+                view1 -> longPressListener != null && longPressListener.onLongClick(root),
+                null));
+
         DynamicGridLayout.ItemLayoutData defaultLayoutData =
                 new DynamicGridLayout.ItemLayoutData(GLANCE_TAG, 0, 0, 3, 1);
         defaultLayoutData.minColSpan = 3;
