@@ -224,16 +224,29 @@ public class GlanceQuickApps {
         recyclerParams.height = iconSizePx * rows;
         recycler.setLayoutParams(recyclerParams);
 
+        int width = anchor.getWidth() > 0 ? anchor.getWidth() : ViewGroup.LayoutParams.MATCH_PARENT;
+
+        // The popup (and so the grid) is always as wide as the Glance card,
+        // which is normally most of the screen. Looping is only meaningful
+        // - and only what "infinite scroll" should mean - once the real
+        // apps don't already fill that width on their own; otherwise
+        // wrapping just repeats the same few icons over and over until they
+        // do, which reads as a bug rather than a feature.
+        int columnsNeeded = (int) Math.ceil(packages.size() / (double) rows);
+        boolean infinite = !packages.isEmpty() && width > 0
+                && columnsNeeded * iconSizePx > width;
+
         GridLayoutManager manager = new GridLayoutManager(activity, rows,
                 GridLayoutManager.HORIZONTAL, false);
         recycler.setLayoutManager(manager);
         recycler.setItemAnimator(null);
 
-        if (scrollMode == ScrollMode.PAGINATION) {
+        if (scrollMode == ScrollMode.PAGINATION && infinite) {
             new PagerSnapHelper().attachToRecyclerView(recycler);
         }
 
-        adapter = new GlanceQuickAppsAdapter(activity, packages, iconSizePx, new GlanceQuickAppsAdapter.Listener() {
+        adapter = new GlanceQuickAppsAdapter(activity, packages, iconSizePx, infinite,
+                new GlanceQuickAppsAdapter.Listener() {
             @Override
             public void onAppClick(String packageName) {
                 LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
@@ -261,24 +274,22 @@ public class GlanceQuickApps {
         recycler.setAdapter(adapter);
         updateEmptyState(empty);
 
-        if (!packages.isEmpty()) {
-            // Both scroll modes wrap around indefinitely (the adapter reports
-            // Integer.MAX_VALUE items and maps position -> real index via
-            // modulo), so start roughly in the middle, aligned to both a row
-            // boundary and a full loop of the real list, to allow scrolling
-            // freely in either direction without ever hitting an edge.
+        if (infinite) {
+            // Wraps around indefinitely (the adapter reports Integer.MAX_VALUE
+            // items and maps position -> real index via modulo), so start
+            // roughly in the middle, aligned to both a row boundary and a full
+            // loop of the real list, to allow scrolling freely in either
+            // direction without ever hitting an edge.
             long block = (long) rows * packages.size();
             long middle = Integer.MAX_VALUE / 2L;
             int startPosition = (int) ((middle / block) * block);
 
             manager.scrollToPosition(startPosition);
-        }
 
-        if (scrollMode == ScrollMode.CONTINUOUS) {
-            attachAutoScroll(recycler);
+            if (scrollMode == ScrollMode.CONTINUOUS) {
+                attachAutoScroll(recycler);
+            }
         }
-
-        int width = anchor.getWidth() > 0 ? anchor.getWidth() : ViewGroup.LayoutParams.MATCH_PARENT;
 
         popupWindow = new PopupWindow(content, width, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         popupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));

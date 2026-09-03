@@ -34,23 +34,30 @@ import com.stario.launcher.ui.icons.AdaptiveIconView;
 import java.util.List;
 
 /**
- * Backs the quick-apps popup grid. Reports an effectively unbounded item
- * count and maps position to the real list via modulo, so both scroll
- * modes (paged, or the continuous auto-scrolling marquee) can loop
- * indefinitely instead of stopping at an edge. See GlanceQuickApps for
- * how the starting position is chosen to keep this illusion seamless.
+ * Backs the quick-apps popup grid. When {@code infinite} is true (there are
+ * more apps than fit in the popup's width), reports an effectively
+ * unbounded item count and maps position to the real list via modulo, so
+ * both scroll modes (paged, or the continuous auto-scrolling marquee) can
+ * loop indefinitely instead of stopping at an edge. When the real apps
+ * already fit without scrolling, {@code infinite} is false and the count is
+ * just the real list - looping a short list would otherwise repeat the same
+ * few icons over and over to fill the width, not read as a feature. See
+ * GlanceQuickApps for how the starting position is chosen to keep the
+ * infinite case seamless.
  */
 class GlanceQuickAppsAdapter extends RecyclerView.Adapter<GlanceQuickAppsAdapter.AppViewHolder> {
     private final LayoutInflater inflater;
     private final List<String> packages;
     private final int iconSizePx;
+    private final boolean infinite;
     private final Listener listener;
 
     GlanceQuickAppsAdapter(ThemedActivity activity, List<String> packages,
-                           int iconSizePx, Listener listener) {
+                           int iconSizePx, boolean infinite, Listener listener) {
         this.inflater = LayoutInflater.from(activity);
         this.packages = packages;
         this.iconSizePx = iconSizePx;
+        this.infinite = infinite;
         this.listener = listener;
     }
 
@@ -114,11 +121,14 @@ class GlanceQuickAppsAdapter extends RecyclerView.Adapter<GlanceQuickAppsAdapter
 
     @Override
     public int getItemCount() {
-        // A real, finite count would make both the paged and the continuous
-        // scroll mode dead-end at the last item; report an effectively
-        // unbounded count instead and wrap onBindViewHolder()'s position
-        // via modulo so scrolling in either direction never runs out.
-        return packages.isEmpty() ? 0 : Integer.MAX_VALUE;
+        if (packages.isEmpty()) {
+            return 0;
+        }
+
+        // Only report an effectively unbounded count (wrapped via modulo in
+        // onBindViewHolder()) when the real list doesn't already fill the
+        // popup's width - see the class doc for why.
+        return infinite ? Integer.MAX_VALUE : packages.size();
     }
 
     public interface Listener {
