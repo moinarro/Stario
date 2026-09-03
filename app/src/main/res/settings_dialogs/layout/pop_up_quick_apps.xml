@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (C) 2026 Răzvan Albu
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>
+  -->
+
+<com.stario.launcher.ui.common.FadingEdgeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:edge="top|bottom"
+    app:size_bottom="20dp"
+    app:size_top="20dp">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:fontFamily="@font/dm_sans_regular"
+                android:text="@string/quick_apps_description"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="@font/dm_sans_medium"
+                android:letterSpacing="-0.03"
+                android:text="@string/quick_apps_icon_size"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/icon_size"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/icon_size_small"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="@string/quick_apps_icon_size_small"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/icon_size_medium"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="@string/quick_apps_icon_size_medium"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/icon_size_large"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="@string/quick_apps_icon_size_large"
+                    android:textSize="14sp" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="@font/dm_sans_medium"
+                android:letterSpacing="-0.03"
+                android:text="@string/quick_apps_rows"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/rows_1"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="1"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/rows_2"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="2"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/rows_3"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="3"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/rows_4"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="4"
+                    android:textSize="14sp" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:fontFamily="@font/dm_sans_medium"
+                android:letterSpacing="-0.03"
+                android:text="@string/quick_apps_scroll_mode"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/scroll_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/scroll_mode_pagination"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="@string/quick_apps_scroll_pagination"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/scroll_mode_continuous"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:text="@string/quick_apps_scroll_continuous"
+                    android:textSize="14sp" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</com.stario.launcher.ui.common.FadingEdgeLayout>

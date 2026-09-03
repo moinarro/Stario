@@ -33,22 +33,25 @@ import com.stario.launcher.ui.icons.AdaptiveIconView;
 
 import java.util.List;
 
-class GlanceQuickAppsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-    private static final int TYPE_APP = 0;
-    private static final int TYPE_ADD = 1;
-
-    private final ThemedActivity activity;
+/**
+ * Backs the quick-apps popup grid. Reports an effectively unbounded item
+ * count and maps position to the real list via modulo, so both scroll
+ * modes (paged, or the continuous auto-scrolling marquee) can loop
+ * indefinitely instead of stopping at an edge. See GlanceQuickApps for
+ * how the starting position is chosen to keep this illusion seamless.
+ */
+class GlanceQuickAppsAdapter extends RecyclerView.Adapter<GlanceQuickAppsAdapter.AppViewHolder> {
     private final LayoutInflater inflater;
     private final List<String> packages;
+    private final int iconSizePx;
     private final Listener listener;
 
-    GlanceQuickAppsAdapter(ThemedActivity activity, List<String> packages, Listener listener) {
-        this.activity = activity;
+    GlanceQuickAppsAdapter(ThemedActivity activity, List<String> packages,
+                           int iconSizePx, Listener listener) {
         this.inflater = LayoutInflater.from(activity);
         this.packages = packages;
+        this.iconSizePx = iconSizePx;
         this.listener = listener;
-
-        setHasStableIds(true);
     }
 
     static class AppViewHolder extends RecyclerView.ViewHolder {
@@ -61,85 +64,66 @@ class GlanceQuickAppsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
     }
 
-    static class AddViewHolder extends RecyclerView.ViewHolder {
-        AddViewHolder(View itemView) {
-            super(itemView);
-        }
-    }
-
-    @Override
-    public int getItemViewType(int position) {
-        return position < packages.size() ? TYPE_APP : TYPE_ADD;
-    }
-
     @NonNull
     @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_ADD) {
-            View view = inflater.inflate(R.layout.glance_quick_apps_add_item, parent, false);
-
-            view.setOnClickListener(v -> {
-                Vibrations.getInstance().vibrate();
-
-                if (listener != null) {
-                    listener.onAddClick();
-                }
-            });
-
-            return new AddViewHolder(view);
-        }
-
+    public AppViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = inflater.inflate(R.layout.glance_quick_apps_item, parent, false);
+
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        params.width = iconSizePx;
+        params.height = iconSizePx;
+        view.setLayoutParams(params);
+
+        int padding = iconSizePx / 9;
+        view.setPadding(padding, padding, padding, padding);
+
         return new AppViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        if (holder instanceof AppViewHolder) {
-            String packageName = packages.get(position);
-            LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
+    public void onBindViewHolder(@NonNull AppViewHolder holder, int position) {
+        if (packages.isEmpty()) {
+            return;
+        }
 
-            AppViewHolder appHolder = (AppViewHolder) holder;
+        String packageName = packages.get(Math.floorMod(position, packages.size()));
+        LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
 
-            if (application != null) {
-                appHolder.icon.setApplication(application);
+        if (application != null) {
+            holder.icon.setApplication(application);
+        }
+
+        holder.icon.setOnClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            if (listener != null) {
+                listener.onAppClick(packageName);
+            }
+        });
+
+        holder.icon.setOnLongClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            if (listener != null) {
+                listener.onAppLongClick(packageName);
             }
 
-            appHolder.icon.setOnClickListener(v -> {
-                Vibrations.getInstance().vibrate();
-
-                if (listener != null) {
-                    listener.onAppClick(packageName);
-                }
-            });
-
-            appHolder.icon.setOnLongClickListener(v -> {
-                Vibrations.getInstance().vibrate();
-
-                if (listener != null) {
-                    listener.onAppLongClick(packageName);
-                }
-
-                return true;
-            });
-        }
-    }
-
-    @Override
-    public long getItemId(int position) {
-        return position < packages.size() ? packages.get(position).hashCode() : Long.MAX_VALUE;
+            return true;
+        });
     }
 
     @Override
     public int getItemCount() {
-        return packages.size() + 1;
+        // A real, finite count would make both the paged and the continuous
+        // scroll mode dead-end at the last item; report an effectively
+        // unbounded count instead and wrap onBindViewHolder()'s position
+        // via modulo so scrolling in either direction never runs out.
+        return packages.isEmpty() ? 0 : Integer.MAX_VALUE;
     }
 
     public interface Listener {
         void onAppClick(String packageName);
 
         void onAppLongClick(String packageName);
-
-        void onAddClick();
     }
 }

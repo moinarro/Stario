@@ -24,11 +24,15 @@ import android.graphics.drawable.ColorDrawable;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
+import android.widget.ImageView;
 import android.widget.PopupWindow;
+import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
@@ -39,6 +43,7 @@ import com.stario.launcher.activities.settings.dialogs.gestures.GestureAppPicker
 import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
 import com.stario.launcher.preferences.Entry;
+import com.stario.launcher.preferences.Vibrations;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
 import com.stario.launcher.ui.utils.animation.Animation;
@@ -51,13 +56,44 @@ import java.util.List;
 /**
  * A free-form, individually curated list of apps (independent from the
  * category system) that the user reaches by long-pressing the Glance
- * card (the day/weather widget). Shown as a 2-row, horizontally paged
- * grid that grows out of the widget in place, rather than as a separate
- * dialog.
+ * card (the day/weather widget). Shown as a paginated or continuously
+ * scrolling grid that grows out of the widget in place, rather than as
+ * a separate dialog. Icon size, row count and scrolling behaviour are
+ * all user-configurable (see {@link IconSize} / {@link ScrollMode} and
+ * the getters/setters below), surfaced through a Settings dialog.
  */
 public class GlanceQuickApps {
     private static final String TAG = "GlanceQuickApps";
     private static final String APPS_KEY = "com.stario.GLANCE_QUICK_APPS_LIST";
+    private static final String ICON_SIZE_KEY = "com.stario.GLANCE_QUICK_APPS_ICON_SIZE";
+    private static final String ROWS_KEY = "com.stario.GLANCE_QUICK_APPS_ROWS";
+    private static final String SCROLL_MODE_KEY = "com.stario.GLANCE_QUICK_APPS_SCROLL_MODE";
+
+    private static final int MIN_ROWS = 1;
+    private static final int MAX_ROWS = 4;
+    private static final int DEFAULT_ROWS = 2;
+
+    // px/frame the continuous scroll mode advances the list by. Roughly
+    // 2dp-equivalent at 60fps, i.e. a slow, readable marquee.
+    private static final float AUTO_SCROLL_SPEED_DP_PER_FRAME = 1.4f;
+    private static final long AUTO_SCROLL_RESUME_DELAY = 700L;
+
+    public enum IconSize {
+        SMALL(52),
+        MEDIUM(72),
+        LARGE(92);
+
+        public final int dp;
+
+        IconSize(int dp) {
+            this.dp = dp;
+        }
+    }
+
+    public enum ScrollMode {
+        PAGINATION,
+        CONTINUOUS
+    }
 
     private final ThemedActivity activity;
     private final SharedPreferences preferences;
@@ -65,6 +101,9 @@ public class GlanceQuickApps {
 
     private PopupWindow popupWindow;
     private GlanceQuickAppsAdapter adapter;
+    private RecyclerView recycler;
+    private Runnable autoScrollRunnable;
+    private Runnable autoScrollResumeRunnable;
 
     public GlanceQuickApps(ThemedActivity activity) {
         this.activity = activity;
@@ -99,6 +138,51 @@ public class GlanceQuickApps {
                 .apply();
     }
 
+    // -------------------------------------------------------------------
+    // Settings, backed by the same SharedPreferences the app list itself
+    // uses. Static so the Settings dialog can read/write them without
+    // needing a live GlanceQuickApps instance, exactly like the rest of
+    // Stario's per-widget preferences (see PinnedCategorySchedule).
+    // -------------------------------------------------------------------
+
+    public static IconSize getIconSize(SharedPreferences preferences) {
+        int ordinal = preferences.getInt(ICON_SIZE_KEY, IconSize.MEDIUM.ordinal());
+        IconSize[] values = IconSize.values();
+
+        return ordinal >= 0 && ordinal < values.length ? values[ordinal] : IconSize.MEDIUM;
+    }
+
+    public static void setIconSize(SharedPreferences preferences, IconSize size) {
+        preferences.edit()
+                .putInt(ICON_SIZE_KEY, size.ordinal())
+                .apply();
+    }
+
+    public static int getRows(SharedPreferences preferences) {
+        int rows = preferences.getInt(ROWS_KEY, DEFAULT_ROWS);
+
+        return Math.max(MIN_ROWS, Math.min(MAX_ROWS, rows));
+    }
+
+    public static void setRows(SharedPreferences preferences, int rows) {
+        preferences.edit()
+                .putInt(ROWS_KEY, Math.max(MIN_ROWS, Math.min(MAX_ROWS, rows)))
+                .apply();
+    }
+
+    public static ScrollMode getScrollMode(SharedPreferences preferences) {
+        int ordinal = preferences.getInt(SCROLL_MODE_KEY, ScrollMode.PAGINATION.ordinal());
+        ScrollMode[] values = ScrollMode.values();
+
+        return ordinal >= 0 && ordinal < values.length ? values[ordinal] : ScrollMode.PAGINATION;
+    }
+
+    public static void setScrollMode(SharedPreferences preferences, ScrollMode mode) {
+        preferences.edit()
+                .putInt(SCROLL_MODE_KEY, mode.ordinal())
+                .apply();
+    }
+
     /**
      * Toggles the in-place quick-apps popup anchored to the Glance card.
      */
@@ -114,19 +198,42 @@ public class GlanceQuickApps {
 
     @SuppressLint("ClickableViewAccessibility")
     private void show(View anchor) {
+        IconSize iconSize = getIconSize(preferences);
+        int rows = getRows(preferences);
+        ScrollMode scrollMode = getScrollMode(preferences);
+
         LayoutInflater inflater = activity.getLayoutInflater();
         View content = inflater.inflate(R.layout.glance_quick_apps_popup, null);
 
-        RecyclerView recycler = content.findViewById(R.id.recycler);
+        TextView empty = content.findViewById(R.id.empty);
+        ImageView add = content.findViewById(R.id.add);
+        recycler = content.findViewById(R.id.recycler);
 
-        GridLayoutManager manager = new GridLayoutManager(activity, 2,
+        add.setOnClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            openAppPicker();
+        });
+
+        int iconSizePx = Measurements.dpToPx(iconSize.dp);
+        // GridLayoutManager doesn't add spacing between rows on its own (no
+        // ItemDecoration is attached), so the RecyclerView's content height is
+        // exactly rows * iconSizePx - matching that exactly avoids any extra
+        // blank space below the last row.
+        ViewGroup.LayoutParams recyclerParams = recycler.getLayoutParams();
+        recyclerParams.height = iconSizePx * rows;
+        recycler.setLayoutParams(recyclerParams);
+
+        GridLayoutManager manager = new GridLayoutManager(activity, rows,
                 GridLayoutManager.HORIZONTAL, false);
         recycler.setLayoutManager(manager);
         recycler.setItemAnimator(null);
 
-        new PagerSnapHelper().attachToRecyclerView(recycler);
+        if (scrollMode == ScrollMode.PAGINATION) {
+            new PagerSnapHelper().attachToRecyclerView(recycler);
+        }
 
-        adapter = new GlanceQuickAppsAdapter(activity, packages, new GlanceQuickAppsAdapter.Listener() {
+        adapter = new GlanceQuickAppsAdapter(activity, packages, iconSizePx, new GlanceQuickAppsAdapter.Listener() {
             @Override
             public void onAppClick(String packageName) {
                 LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
@@ -143,29 +250,33 @@ public class GlanceQuickApps {
                 packages.remove(packageName);
                 save();
 
+                updateEmptyState(empty);
+
                 if (adapter != null) {
                     adapter.notifyDataSetChanged();
                 }
             }
-
-            @Override
-            public void onAddClick() {
-                GestureAppPickerDialog dialog = new GestureAppPickerDialog(activity, packageName -> {
-                    if (packageName != null && !packages.contains(packageName)) {
-                        packages.add(packageName);
-                        save();
-
-                        if (adapter != null) {
-                            adapter.notifyDataSetChanged();
-                        }
-                    }
-                });
-
-                dialog.show();
-            }
         });
 
         recycler.setAdapter(adapter);
+        updateEmptyState(empty);
+
+        if (!packages.isEmpty()) {
+            // Both scroll modes wrap around indefinitely (the adapter reports
+            // Integer.MAX_VALUE items and maps position -> real index via
+            // modulo), so start roughly in the middle, aligned to both a row
+            // boundary and a full loop of the real list, to allow scrolling
+            // freely in either direction without ever hitting an edge.
+            long block = (long) rows * packages.size();
+            long middle = Integer.MAX_VALUE / 2L;
+            int startPosition = (int) ((middle / block) * block);
+
+            manager.scrollToPosition(startPosition);
+        }
+
+        if (scrollMode == ScrollMode.CONTINUOUS) {
+            attachAutoScroll(recycler);
+        }
 
         int width = anchor.getWidth() > 0 ? anchor.getWidth() : ViewGroup.LayoutParams.MATCH_PARENT;
 
@@ -174,6 +285,7 @@ public class GlanceQuickApps {
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         popupWindow.setElevation(Measurements.dpToPx(8));
+        popupWindow.setOnDismissListener(this::stopAutoScroll);
 
         content.setAlpha(0f);
         content.setScaleY(0.85f);
@@ -194,7 +306,7 @@ public class GlanceQuickApps {
         int[] anchorLocation = new int[2];
         anchor.getLocationOnScreen(anchorLocation);
 
-        int margin = (int) Measurements.dpToPx(8);
+        int margin = Measurements.dpToPx(8);
         int screenHeight = Measurements.getHeight();
 
         int spaceBelow = screenHeight - (anchorLocation[1] + anchor.getHeight());
@@ -218,6 +330,111 @@ public class GlanceQuickApps {
                 .setInterpolator(new DecelerateInterpolator())
                 .setDuration(Animation.SHORT.getDuration())
                 .start();
+    }
+
+    private void openAppPicker() {
+        GestureAppPickerDialog dialog = new GestureAppPickerDialog(activity, packageName -> {
+            if (packageName != null && !packages.contains(packageName)) {
+                packages.add(packageName);
+                save();
+
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
+
+                if (popupWindow != null && popupWindow.getContentView() != null) {
+                    updateEmptyState(popupWindow.getContentView().findViewById(R.id.empty));
+                }
+            }
+        });
+
+        dialog.show();
+    }
+
+    private void updateEmptyState(TextView empty) {
+        if (empty == null) {
+            return;
+        }
+
+        boolean isEmpty = packages.isEmpty();
+
+        empty.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+
+        if (recycler != null) {
+            recycler.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /**
+     * Drives the "continuous" scroll mode: a slow, uninterrupted marquee
+     * that pauses while the user is touching the list and resumes shortly
+     * after they let go, rather than fighting their drag.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private void attachAutoScroll(RecyclerView recycler) {
+        float speedPx = AUTO_SCROLL_SPEED_DP_PER_FRAME * Measurements.getDensity();
+
+        autoScrollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (GlanceQuickApps.this.recycler == null) {
+                    return;
+                }
+
+                GlanceQuickApps.this.recycler.scrollBy((int) Math.max(1, speedPx), 0);
+                GlanceQuickApps.this.recycler.postOnAnimation(this);
+            }
+        };
+
+        autoScrollResumeRunnable = () -> {
+            if (this.recycler != null && autoScrollRunnable != null) {
+                this.recycler.postOnAnimation(autoScrollRunnable);
+            }
+        };
+
+        recycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView view, @NonNull MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        pauseAutoScroll();
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        resumeAutoScrollDelayed();
+                        break;
+                }
+
+                return false;
+            }
+        });
+
+        recycler.postOnAnimation(autoScrollRunnable);
+    }
+
+    private void pauseAutoScroll() {
+        if (recycler != null) {
+            if (autoScrollRunnable != null) {
+                recycler.removeCallbacks(autoScrollRunnable);
+            }
+
+            if (autoScrollResumeRunnable != null) {
+                recycler.removeCallbacks(autoScrollResumeRunnable);
+            }
+        }
+    }
+
+    private void resumeAutoScrollDelayed() {
+        if (recycler != null && autoScrollResumeRunnable != null) {
+            recycler.postDelayed(autoScrollResumeRunnable, AUTO_SCROLL_RESUME_DELAY);
+        }
+    }
+
+    private void stopAutoScroll() {
+        pauseAutoScroll();
+
+        recycler = null;
     }
 
     private void dismiss() {

@@ -44,6 +44,7 @@ import com.stario.launcher.activities.launcher.widgets.SearchWidget;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.Media;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
+import com.stario.launcher.activities.settings.dialogs.apps.QuickAppsDialog;
 import com.stario.launcher.activities.settings.dialogs.gestures.GesturesDialog;
 import com.stario.launcher.activities.settings.dialogs.location.LocationDialog;
 import com.stario.launcher.activities.settings.dialogs.pin.PinnedCategoryDialog;
@@ -187,6 +188,25 @@ public class HomeScreenDialog extends ActionDialog {
             public void onClick(View view) {
                 if (dialog == null) {
                     dialog = new GesturesDialog(activity);
+                    dialog.setOnDismissListener(d -> showing = false);
+                }
+
+                if (!showing) {
+                    dialog.show();
+                    showing = true;
+                }
+            }
+        });
+
+        // Glance quick apps
+        root.findViewById(R.id.quick_apps_container).setOnClickListener(new View.OnClickListener() {
+            private QuickAppsDialog dialog;
+            private boolean showing = false;
+
+            @Override
+            public void onClick(View view) {
+                if (dialog == null) {
+                    dialog = new QuickAppsDialog(activity);
                     dialog.setOnDismissListener(d -> showing = false);
                 }
 
