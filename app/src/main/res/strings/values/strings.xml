@@ -78,6 +78,28 @@
     <string name="weather">Weather</string>
     <string name="lock">lock</string>
 
+    <!-- Two-finger gestures -->
+    <string name="gestures">Gestures</string>
+    <string name="two_finger_gestures">Two-finger swipe</string>
+    <string name="gesture_swipe_up">Swipe up</string>
+    <string name="gesture_swipe_down">Swipe down</string>
+    <string name="gesture_swipe_left">Swipe left</string>
+    <string name="gesture_swipe_right">Swipe right</string>
+    <string name="gesture_not_assigned">Not assigned</string>
+    <string name="gesture_pick_app">Choose an app to open, or none to disable this gesture</string>
+    <string name="none">None</string>
+
+    <!-- Pinned category schedule -->
+    <string name="pinned_category_schedule">Switch by time of day</string>
+    <string name="pinned_category_schedule_description">Automatically show a different category depending on the time of day</string>
+    <string name="pinned_category_schedule_edit">Edit schedule</string>
+    <string name="pinned_category_schedule_add">Add time slot</string>
+    <string name="pinned_category_schedule_empty">No time slots yet. Tap \"Add time slot\" to create one.</string>
+    <string name="pinned_category_schedule_choose_category">Choose category</string>
+    <string name="pinned_category_schedule_start">Start time</string>
+    <string name="pinned_category_schedule_end">End time</string>
+    <string name="delete">Delete</string>
+
     <!-- Page Manager -->
     <string name="default_position">Default position</string>
     <string name="left">Left</string>

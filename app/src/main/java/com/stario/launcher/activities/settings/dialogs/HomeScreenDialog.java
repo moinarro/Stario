@@ -44,6 +44,7 @@ import com.stario.launcher.activities.launcher.widgets.SearchWidget;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.Media;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
+import com.stario.launcher.activities.settings.dialogs.gestures.GesturesDialog;
 import com.stario.launcher.activities.settings.dialogs.location.LocationDialog;
 import com.stario.launcher.activities.settings.dialogs.pin.PinnedCategoryDialog;
 import com.stario.launcher.apps.CategoryManager;
@@ -168,6 +169,25 @@ public class HomeScreenDialog extends ActionDialog {
                         updatePinnedCategoryName();
                         showing = false;
                     });
+                }
+
+                if (!showing) {
+                    dialog.show();
+                    showing = true;
+                }
+            }
+        });
+
+        // Two-finger swipe gestures
+        root.findViewById(R.id.gestures_container).setOnClickListener(new View.OnClickListener() {
+            private GesturesDialog dialog;
+            private boolean showing = false;
+
+            @Override
+            public void onClick(View view) {
+                if (dialog == null) {
+                    dialog = new GesturesDialog(activity);
+                    dialog.setOnDismissListener(d -> showing = false);
                 }
 
                 if (!showing) {

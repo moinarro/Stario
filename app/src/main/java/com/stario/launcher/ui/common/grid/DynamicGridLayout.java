@@ -153,6 +153,10 @@ public class DynamicGridLayout extends ViewGroup {
         return runningAnimations > 0;
     }
 
+    public boolean isRearrangeable() {
+        return isRearrangeable;
+    }
+
     public void setRearrangeable(boolean rearrangeable) {
         if (this.isRearrangeable == rearrangeable) {
             return;

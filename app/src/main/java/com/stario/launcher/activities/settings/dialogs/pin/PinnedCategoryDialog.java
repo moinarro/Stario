@@ -31,6 +31,7 @@ import com.google.android.material.divider.MaterialDividerItemDecoration;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
+import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategorySchedule;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.dialogs.ActionDialog;
 import com.stario.launcher.ui.recyclers.DividerItemDecorator;
@@ -82,7 +83,44 @@ public class PinnedCategoryDialog extends ActionDialog {
             }
         }));
 
+        setupSchedule(root, recycler);
+
         return root;
+    }
+
+    private void setupSchedule(View root, RecyclerView recycler) {
+        MaterialSwitch scheduleSwitch = root.findViewById(R.id.schedule);
+        View scheduleEditContainer = root.findViewById(R.id.schedule_edit_container);
+
+        Runnable updateVisibility = () -> {
+            boolean enabled = PinnedCategorySchedule.isEnabled(preferences);
+
+            scheduleEditContainer.setVisibility(enabled ? View.VISIBLE : View.GONE);
+            recycler.setAlpha(enabled ? 0.4f : 1f);
+            recycler.setEnabled(!enabled);
+        };
+
+        scheduleSwitch.setChecked(PinnedCategorySchedule.isEnabled(preferences));
+        scheduleSwitch.jumpDrawablesToCurrentState();
+        updateVisibility.run();
+
+        scheduleSwitch.setOnCheckedChangeListener((compound, isChecked) -> {
+            PinnedCategorySchedule.setEnabled(preferences, isChecked);
+
+            updateVisibility.run();
+
+            if (isChecked) {
+                PinnedCategorySchedule.apply(preferences);
+            }
+        });
+
+        root.findViewById(R.id.schedule_container).setOnClickListener(view -> scheduleSwitch.performClick());
+
+        scheduleEditContainer.setOnClickListener(view -> {
+            PinnedCategoryScheduleDialog dialog = new PinnedCategoryScheduleDialog(activity, preferences);
+
+            dialog.show();
+        });
     }
 
     @Override

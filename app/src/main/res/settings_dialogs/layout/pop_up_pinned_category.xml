@@ -51,6 +51,58 @@
 
     </carbon.widget.RelativeLayout>
 
+    <carbon.widget.RelativeLayout
+        android:id="@+id/schedule_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/ripple"
+        android:padding="7dp"
+        app:carbon_cornerRadius="20dp">
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/schedule"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="false"
+            android:drawableStart="@drawable/ic_watch"
+            android:drawablePadding="10dp"
+            android:fontFamily="@font/dm_sans_medium"
+            android:letterSpacing="-0.03"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/pinned_category_schedule"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp" />
+
+    </carbon.widget.RelativeLayout>
+
+    <carbon.widget.RelativeLayout
+        android:id="@+id/schedule_edit_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/ripple"
+        android:padding="7dp"
+        app:carbon_cornerRadius="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/ic_edit"
+            android:drawablePadding="10dp"
+            android:fontFamily="@font/dm_sans_medium"
+            android:letterSpacing="-0.03"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="@string/pinned_category_schedule_edit"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp" />
+
+    </carbon.widget.RelativeLayout>
+
     <carbon.widget.RecyclerView
         android:id="@+id/recycler"
         android:layout_width="match_parent"

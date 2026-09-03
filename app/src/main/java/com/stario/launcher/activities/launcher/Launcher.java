@@ -23,10 +23,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -46,7 +48,11 @@ import com.stario.launcher.activities.launcher.widgets.glance.extensions.calenda
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.Media;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
+import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategorySchedule;
 import com.stario.launcher.activities.settings.Settings;
+import com.stario.launcher.gestures.Gestures;
+import com.stario.launcher.gestures.TwoFingerSwipeGestureDetector;
+import com.stario.launcher.preferences.Entry;
 import com.stario.launcher.preferences.Vibrations;
 import com.stario.launcher.sheet.SheetsFocusController;
 import com.stario.launcher.themes.ThemedActivity;
@@ -67,6 +73,7 @@ public class Launcher extends ThemedActivity {
     public static final String ACTION_KILL_TASK = "com.stario.launcher.ACTION_KILL_TASK";
 
     private BackGestureEventBus.BackEventListener backEventListener;
+    private TwoFingerSwipeGestureDetector twoFingerSwipeDetector;
     private BroadcastReceiver screenOnReceiver;
     private SheetsFocusController controller;
     private BroadcastReceiver killReceiver;
@@ -80,6 +87,8 @@ public class Launcher extends ThemedActivity {
     private View statusBarContrast;
     private View navBarContrast;
     private View decorView;
+    private SharedPreferences pinnedCategoryPreferences;
+    private Gestures gestures;
     private Glance glance;
 
     public Launcher() {
@@ -200,9 +209,60 @@ public class Launcher extends ThemedActivity {
         attachGlance(container);
         attachSearch(container);
         attachClock(container);
+        attachGestures();
+    }
+
+    private void attachGestures() {
+        gestures = new Gestures(this);
+        twoFingerSwipeDetector = new TwoFingerSwipeGestureDetector(this);
+
+        twoFingerSwipeDetector.setOnSwipeListener(new TwoFingerSwipeGestureDetector.OnSwipeListener() {
+            @Override
+            public void onGestureArmed() {
+                // a second finger just touched down; make sure nothing that the
+                // first finger may have already started (drag, scroll, sheet
+                // drag, ...) keeps running underneath the two-finger gesture
+                long now = android.os.SystemClock.uptimeMillis();
+                MotionEvent cancel = MotionEvent.obtain(now, now,
+                        MotionEvent.ACTION_CANCEL, 0, 0, 0);
+
+                try {
+                    Launcher.super.dispatchTouchEvent(cancel);
+                } finally {
+                    cancel.recycle();
+                }
+            }
+
+            @Override
+            public void onSwipe(TwoFingerSwipeGestureDetector.Direction direction) {
+                gestures.trigger(Launcher.this, direction);
+            }
+
+            @Override
+            public void onGestureFinished() {
+                // nothing to do; the next ACTION_DOWN will flow through normally
+            }
+        });
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (container != null && !container.isRearrangeable()
+                && twoFingerSwipeDetector != null) {
+            boolean owned = twoFingerSwipeDetector.onTouchEvent(event);
+
+            if (owned) {
+                return true;
+            }
+        }
+
+        return super.dispatchTouchEvent(event);
     }
 
     private void attachPinnedCategory(DynamicGridLayout container) {
+        pinnedCategoryPreferences = getApplicationContext().getSharedPreferences(Entry.PINNED_CATEGORY);
+        PinnedCategorySchedule.apply(pinnedCategoryPreferences);
+
         pinnedCategory = new PinnedCategory(this);
         pinnedCategory.attach(container,
                 () -> controller.hideAllSheets(),
@@ -383,6 +443,10 @@ public class Launcher extends ThemedActivity {
 
     @Override
     protected void onResume() {
+        if (pinnedCategoryPreferences != null) {
+            PinnedCategorySchedule.apply(pinnedCategoryPreferences);
+        }
+
         glance.update();
         updateWallpaperZoom(0f);
 

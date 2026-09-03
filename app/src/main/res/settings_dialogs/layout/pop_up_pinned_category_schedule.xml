@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (C) 2026 Răzvan Albu
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>
+  -->
+
+<carbon.widget.LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/content"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="20dp"
+    android:paddingTop="20dp"
+    android:paddingRight="20dp"
+    android:paddingBottom="20dp"
+    app:carbon_maxHeight="500dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="10dp"
+        android:layout_marginBottom="10dp"
+        android:fontFamily="@font/dm_sans_regular"
+        android:text="@string/pinned_category_schedule_description"
+        android:textColor="?attr/colorSecondary"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"
+        android:fontFamily="@font/dm_sans_regular"
+        android:text="@string/pinned_category_schedule_empty"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <carbon.widget.RecyclerView
+        android:id="@+id/recycler"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="15dp"
+        android:nestedScrollingEnabled="true"
+        android:overScrollMode="never"
+        app:carbon_cornerRadius="20dp"
+        app:carbon_overScroll="never" />
+
+    <carbon.widget.RelativeLayout
+        android:id="@+id/add_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/ripple"
+        android:padding="7dp"
+        app:carbon_cornerRadius="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/ic_add"
+            android:drawablePadding="10dp"
+            android:fontFamily="@font/dm_sans_medium"
+            android:gravity="center_vertical"
+            android:letterSpacing="-0.03"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="@string/pinned_category_schedule_add"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp" />
+
+    </carbon.widget.RelativeLayout>
+
+</carbon.widget.LinearLayout>
