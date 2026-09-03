@@ -50,6 +50,20 @@
                 android:textSize="30sp" />
 
             <carbon.widget.RelativeLayout
+                android:id="@+id/stack_entry_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                app:carbon_cornerRadius="20dp">
+
+                <FrameLayout
+                    android:id="@+id/stack_entry"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+            </carbon.widget.RelativeLayout>
+
+            <carbon.widget.RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:carbon_cornerRadius="20dp">

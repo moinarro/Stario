@@ -20,7 +20,6 @@ package com.stario.launcher.ui.widgets;
 import android.animation.AnimatorSet;
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
-import android.appwidget.AppWidgetHostView;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -161,7 +160,7 @@ public class WidgetGrid extends GridLayout {
         return getMeasuredWidth() / columnCount.getObject();
     }
 
-    public void attach(AppWidgetHostView host, Widget widget) {
+    public void attach(View host, Widget widget) {
         WidgetMap.Cell cell = map.getAvailableOrigin(widget.size);
 
         super.addView(new WidgetContainer(getContext(), host, widget, cell));

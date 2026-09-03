@@ -33,10 +33,25 @@ public class Widget implements Comparable<Widget> {
     @SerializedName("position")
     public int position; // up-down
 
+    // Marks this slot as a widget stack (a horizontally-scrolling carousel of
+    // several real app widgets) rather than a single bound AppWidget. Absent
+    // in previously-serialized entries, which Gson defaults to false, so
+    // existing widgets keep working unchanged.
+    @SerializedName("stack")
+    public boolean isStack;
+
     public Widget(int id, int position, WidgetSize size) {
         this.id = id;
         this.position = position;
         this.size = size;
+        this.isStack = false;
+    }
+
+    public Widget(int id, int position, WidgetSize size, boolean isStack) {
+        this.id = id;
+        this.position = position;
+        this.size = size;
+        this.isStack = isStack;
     }
 
     public static Widget deserialize(String data) {

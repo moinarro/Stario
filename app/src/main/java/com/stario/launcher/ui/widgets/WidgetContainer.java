@@ -20,6 +20,7 @@ package com.stario.launcher.ui.widgets;
 import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
+import android.view.View;
 import android.widget.GridLayout;
 import android.widget.RelativeLayout;
 
@@ -31,11 +32,14 @@ import com.stario.launcher.ui.Measurements;
 
 @SuppressLint("ViewConstructor")
 public class WidgetContainer extends RelativeLayout implements Comparable<WidgetContainer> {
-    private final AppWidgetHostView host;
+    // Usually an AppWidgetHostView, but a widget stack slot hosts a plain
+    // View (WidgetStackView) instead - there is no single AppWidgetHostView
+    // to report a size to, each of its child pages manages its own.
+    private final View host;
     private final Widget widget;
     private WidgetMap.Cell origin; // top-left
 
-    WidgetContainer(Context context, AppWidgetHostView host, Widget widget, WidgetMap.Cell cell) {
+    WidgetContainer(Context context, View host, Widget widget, WidgetMap.Cell cell) {
         super(context);
 
         this.origin = cell;
@@ -76,8 +80,8 @@ public class WidgetContainer extends RelativeLayout implements Comparable<Widget
         int hostWidth = params.width - getPaddingLeft() - getPaddingRight();
         int hostHeight = params.height - getPaddingTop() - getPaddingBottom();
 
-        if (getMeasuredWidth() > 0 && getMeasuredHeight() > 0) {
-            host.updateAppWidgetSize(null,
+        if (getMeasuredWidth() > 0 && getMeasuredHeight() > 0 && host instanceof AppWidgetHostView) {
+            ((AppWidgetHostView) host).updateAppWidgetSize(null,
                     (int) (hostWidth / Measurements.getDensity()),
                     (int) (hostHeight / Measurements.getDensity()),
                     (int) (hostWidth / Measurements.getDensity()),

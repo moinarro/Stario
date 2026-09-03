@@ -175,6 +175,11 @@
     <string name="widgets">Widgets</string>
     <string name="widget_one">widget</string>
     <string name="widget_many">widgets</string>
+    <string name="widget_stack">Widget stack</string>
+    <string name="widget_stack_description">Several widgets in one tile, swipe between them</string>
+    <string name="widget_stack_add">Add widget</string>
+    <string name="widget_stack_page_count">%1$d / %2$d</string>
+    <string name="remove_from_stack">Remove from stack</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
     <string name="move_left">Move left</string>

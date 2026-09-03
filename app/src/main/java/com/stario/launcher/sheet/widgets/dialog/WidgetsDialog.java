@@ -49,6 +49,7 @@ import com.stario.launcher.sheet.SheetDialogFragment;
 import com.stario.launcher.sheet.SheetType;
 import com.stario.launcher.sheet.widgets.Widget;
 import com.stario.launcher.sheet.widgets.WidgetSize;
+import com.stario.launcher.sheet.widgets.WidgetStack;
 import com.stario.launcher.sheet.widgets.configurator.WidgetConfigurator;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
@@ -59,11 +60,15 @@ import com.stario.launcher.ui.widgets.WidgetContainer;
 import com.stario.launcher.ui.widgets.WidgetGrid;
 import com.stario.launcher.ui.widgets.WidgetHost;
 import com.stario.launcher.ui.widgets.WidgetScroller;
+import com.stario.launcher.ui.widgets.WidgetStackView;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 public class WidgetsDialog extends SheetDialogFragment {
     private static final String TAG = "WidgetsDialog";
@@ -73,10 +78,20 @@ public class WidgetsDialog extends SheetDialogFragment {
     private static int columnSize = 0;
 
     private ActivityResultLauncher<Intent> bindWidgetRequest;
+    private ActivityResultLauncher<Intent> stackBindWidgetRequest;
     private WidgetConfigurator configurator;
+    private WidgetConfigurator stackConfigurator;
     private boolean isConfiguratorVisible;
+    private boolean isStackConfiguratorVisible;
     private SharedPreferences widgetStore;
+    private SharedPreferences widgetStackStore;
     private WidgetSize pendingWidgetSize;
+    // Target of an in-flight "add a widget to this stack" flow. Only one such
+    // flow can be in progress at a time (the picker is modal), so plain
+    // fields - rather than something keyed per-stack - are enough.
+    private Widget pendingStackWidget;
+    private WidgetStack pendingStack;
+    private WidgetStackView pendingStackView;
     private AppWidgetManager manager;
     private WidgetScroller scroller;
     private View addWidgetContainer;
@@ -110,6 +125,8 @@ public class WidgetsDialog extends SheetDialogFragment {
         this.manager = AppWidgetManager.getInstance(activity);
         this.widgetStore = activity.getApplicationContext()
                 .getSharedPreferences(Entry.WIDGETS);
+        this.widgetStackStore = activity.getApplicationContext()
+                .getSharedPreferences(Entry.WIDGET_STACKS);
 
         bindWidgetRequest = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -127,6 +144,22 @@ public class WidgetsDialog extends SheetDialogFragment {
                     }
 
                     pendingWidgetSize = null;
+                });
+
+        stackBindWidgetRequest = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+
+                        if (data != null) {
+                            int identifier = data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
+
+                            if (identifier != -1) {
+                                finishStackChildSetup(identifier);
+                            }
+                        }
+                    }
                 });
     }
 
@@ -188,24 +221,51 @@ public class WidgetsDialog extends SheetDialogFragment {
 
         PriorityQueue<Widget> widgets = new PriorityQueue<>();
 
+        // Ids that legitimately belong to this host: either a top-level slot
+        // (widgetStore) or a child bound inside one of its widget stacks
+        // (widgetStackStore). Anything else allocated under this host is a
+        // leftover from a previous run and gets cleaned up below. Without
+        // counting stack children here, the loop that follows would treat
+        // every one of them as an orphan and delete it on every reopen.
+        Set<Integer> ownedIdentifiers = new HashSet<>();
+
+        for (String key : widgetStore.getAll().keySet()) {
+            try {
+                ownedIdentifiers.add(Integer.valueOf(key));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        for (Map.Entry<String, ?> entry : widgetStackStore.getAll().entrySet()) {
+            Object value = entry.getValue();
+
+            if (value instanceof String) {
+                WidgetStack stack = WidgetStack.deserialize((String) value);
+
+                if (stack != null) {
+                    ownedIdentifiers.addAll(stack.children);
+                }
+            }
+        }
+
         for (int identifier : WidgetsDialog.this.requireWidgetHost().getAppWidgetIds()) {
-            if (widgetStore.contains(String.valueOf(identifier))) {
-                String serial = widgetStore.getString(String.valueOf(identifier), null);
+            if (!ownedIdentifiers.contains(identifier)) {
+                WidgetsDialog.this.requireWidgetHost().deleteAppWidgetId(identifier);
+            }
+        }
 
-                Widget widget = Widget.deserialize(serial);
+        for (String key : widgetStore.getAll().keySet()) {
+            String serial = widgetStore.getString(key, null);
+            Widget widget = Widget.deserialize(serial);
 
-                if (widget != null) {
-                    if (widgets.size() < MAX_COUNT) {
-                        widgets.add(widget);
-                    } else {
-                        WidgetsDialog.this.requireWidgetHost().deleteAppWidgetId(identifier);
-                    }
+            if (widget != null) {
+                if (widgets.size() < MAX_COUNT) {
+                    widgets.add(widget);
                 } else {
-                    widgetStore.edit().remove(String.valueOf(identifier)).apply();
+                    deleteWidgetSlot(widget);
                 }
             } else {
-                WidgetsDialog.this.requireWidgetHost()
-                        .deleteAppWidgetId(identifier);
+                widgetStore.edit().remove(key).apply();
             }
         }
 
@@ -214,7 +274,8 @@ public class WidgetsDialog extends SheetDialogFragment {
             Widget widget = widgets.poll();
 
             if (widget != null) {
-                AppWidgetHostView host = createWidgetView(manager, widget);
+                View host = widget.isStack ? createStackView(widget) : createWidgetView(manager, widget);
+
                 grid.attach(host, widget);
 
                 updatePlaceholderVisibility(View.GONE);
@@ -243,7 +304,17 @@ public class WidgetsDialog extends SheetDialogFragment {
 
     private void showWidgetPicker() {
         if (configurator == null) {
-            configurator = new WidgetConfigurator(activity, this::addWidget);
+            configurator = new WidgetConfigurator(activity, new WidgetConfigurator.Request() {
+                @Override
+                public void requestAddition(AppWidgetProviderInfo info, WidgetSize size) {
+                    addWidget(info, size);
+                }
+
+                @Override
+                public void requestStackAddition(WidgetSize size) {
+                    addWidgetStack(size);
+                }
+            });
 
             configurator.setOnDismissListener(dialog -> isConfiguratorVisible = false);
         }
@@ -321,6 +392,276 @@ public class WidgetsDialog extends SheetDialogFragment {
 
         grid.attach(host, widget);
         updatePlaceholderVisibility(View.GONE);
+    }
+
+    // -------------------------------------------------------------------
+    // Widget stacks: one grid slot hosting several real, independently
+    // bound app widgets as horizontally-swipeable pages (WidgetStackView).
+    // The slot's own Widget.id is a real AppWidgetHost id like any other -
+    // it just never gets bound to a provider, and is only ever used as the
+    // key for its WidgetStack entry (the ordered list of its children's
+    // ids) in widgetStackStore.
+    // -------------------------------------------------------------------
+
+    private void addWidgetStack(WidgetSize size) {
+        if (grid.getChildCount() <= MAX_COUNT) {
+            int identifier = requireWidgetHost().allocateAppWidgetId();
+            Widget widget = new Widget(identifier, grid.allocatePosition(), size, true);
+
+            saveStack(widget.id, new WidgetStack());
+            widgetStore.edit()
+                    .putString(String.valueOf(widget.id), widget.serialize())
+                    .apply();
+
+            grid.attach(createStackView(widget), widget);
+            updatePlaceholderVisibility(View.GONE);
+        }
+
+        configurator.dismiss();
+    }
+
+    private WidgetStackView createStackView(Widget widget) {
+        WidgetStack stack = loadStack(widget.id);
+
+        WidgetStackView view = new WidgetStackView(activity, stack.children, new WidgetStackView.Callback() {
+            @Override
+            public View createChildView(int appWidgetId) {
+                AppWidgetProviderInfo info = manager.getAppWidgetInfo(appWidgetId);
+
+                if (info == null) {
+                    return null;
+                }
+
+                return requireWidgetHost()
+                        .createView(activity.getApplicationContext(), appWidgetId, info);
+            }
+
+            @Override
+            public void onAddRequested(WidgetStackView stackView) {
+                showStackChildPicker(widget, stack, stackView);
+            }
+
+            @Override
+            public void onRemoveRequested(WidgetStackView stackView, int appWidgetId) {
+                requireWidgetHost().deleteAppWidgetId(appWidgetId);
+
+                stack.children.remove(Integer.valueOf(appWidgetId));
+                saveStack(widget.id, stack);
+
+                stackView.notifyChildrenChanged();
+            }
+        });
+
+        view.setOnHeaderLongClickListener(v -> {
+            showStackOptionsMenu(view, widget);
+
+            return true;
+        });
+
+        return view;
+    }
+
+    private void showStackChildPicker(Widget stackWidget, WidgetStack stack, WidgetStackView stackView) {
+        pendingStackWidget = stackWidget;
+        pendingStack = stack;
+        pendingStackView = stackView;
+
+        if (stackConfigurator == null) {
+            stackConfigurator = new WidgetConfigurator(activity, new WidgetConfigurator.Request() {
+                @Override
+                public void requestAddition(AppWidgetProviderInfo info, WidgetSize size) {
+                    addStackChild(info);
+                }
+
+                @Override
+                public void requestStackAddition(WidgetSize size) {
+                    // Nesting a stack inside a stack isn't supported.
+                    if (stackConfigurator != null) {
+                        stackConfigurator.dismiss();
+                    }
+                }
+            });
+
+            stackConfigurator.setOnDismissListener(dialog -> isStackConfiguratorVisible = false);
+        }
+
+        if (!isStackConfiguratorVisible) {
+            stackConfigurator.show();
+            isStackConfiguratorVisible = true;
+        }
+    }
+
+    private void addStackChild(AppWidgetProviderInfo info) {
+        if (pendingStackWidget == null || pendingStack == null || pendingStackView == null) {
+            if (stackConfigurator != null) {
+                stackConfigurator.dismiss();
+            }
+
+            return;
+        }
+
+        int identifier = requireWidgetHost().allocateAppWidgetId();
+        boolean allowed = manager.bindAppWidgetIdIfAllowed(identifier, info.getProfile(), info.provider, null);
+
+        if (!allowed) {
+            Intent intent = new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND);
+
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, identifier);
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider);
+
+            stackBindWidgetRequest.launch(intent);
+        } else {
+            finishStackChildSetup(identifier);
+        }
+
+        if (stackConfigurator != null) {
+            stackConfigurator.dismiss();
+        }
+    }
+
+    private void finishStackChildSetup(int identifier) {
+        if (pendingStackWidget == null || pendingStack == null || pendingStackView == null) {
+            requireWidgetHost().deleteAppWidgetId(identifier);
+
+            return;
+        }
+
+        Widget capturedWidget = pendingStackWidget;
+        WidgetStack capturedStack = pendingStack;
+        WidgetStackView capturedView = pendingStackView;
+
+        pendingStackWidget = null;
+        pendingStack = null;
+        pendingStackView = null;
+
+        Runnable complete = () -> {
+            capturedStack.children.add(identifier);
+            saveStack(capturedWidget.id, capturedStack);
+
+            capturedView.notifyChildrenChanged();
+        };
+
+        AppWidgetProviderInfo info = manager.getAppWidgetInfo(identifier);
+
+        if (info == null || info.configure == null) {
+            complete.run();
+        } else {
+            try {
+                boolean result = activity.addOnActivityResultListener(CONFIGURATION_CODE,
+                        (resultCode, intent) -> {
+                            if (resultCode == Activity.RESULT_OK) {
+                                complete.run();
+                            } else {
+                                requireWidgetHost().deleteAppWidgetId(identifier);
+                            }
+
+                            activity.removeOnActivityResultListener(CONFIGURATION_CODE);
+                        });
+
+                if (!result) {
+                    requireWidgetHost().deleteAppWidgetId(identifier);
+                    activity.removeOnActivityResultListener(CONFIGURATION_CODE);
+                } else {
+                    requireWidgetHost().startAppWidgetConfigureActivityForResult(activity, identifier,
+                            Intent.FLAG_ACTIVITY_RETAIN_IN_RECENTS | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+                            CONFIGURATION_CODE, getActivityOptionsBundle());
+                }
+            } catch (ActivityNotFoundException exception) {
+                complete.run();
+                activity.removeOnActivityResultListener(CONFIGURATION_CODE);
+
+                Log.w(TAG, "No configure activity found for stack child identifier " + identifier);
+            }
+        }
+    }
+
+    private void showStackOptionsMenu(WidgetStackView view, Widget widget) {
+        Vibrations.getInstance().vibrate();
+
+        PopupMenu menu = new PopupMenu(activity);
+        Resources resources = getResources();
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.remove),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_delete),
+                v -> deleteStack(view, widget))
+        );
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.create_a_widget),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_add),
+                v -> showWidgetPicker())
+        );
+
+        if (widget.size == WidgetSize.SMALL) {
+            menu.add(new PopupMenu.Item(resources.getString(R.string.move_left),
+                    AppCompatResources.getDrawable(activity, R.drawable.ic_move_left),
+                    v -> moveWidgetLeftRight(widget, +1)));
+
+            menu.add(new PopupMenu.Item(resources.getString(R.string.move_right),
+                    AppCompatResources.getDrawable(activity, R.drawable.ic_move_right),
+                    v -> moveWidgetLeftRight(widget, -1)));
+        }
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.move_up),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_move_up),
+                v -> moveWidgetUpDown(widget, +1)));
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.move_down),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_move_down),
+                v -> moveWidgetUpDown(widget, -1)));
+
+        menu.show(activity, view, PopupMenu.PIVOT_CENTER_HORIZONTAL, true);
+    }
+
+    private void deleteStack(WidgetStackView view, Widget widget) {
+        WidgetStack stack = loadStack(widget.id);
+
+        for (int childId : stack.children) {
+            requireWidgetHost().deleteAppWidgetId(childId);
+        }
+
+        widgetStackStore.edit().remove(String.valueOf(widget.id)).apply();
+        widgetStore.edit().remove(String.valueOf(widget.id)).apply();
+        requireWidgetHost().deleteAppWidgetId(widget.id);
+
+        if (view.getParent() instanceof View) {
+            grid.removeView((View) view.getParent());
+        }
+
+        updatePlaceholderVisibility(grid.getChildCount() == 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * Cleans up a persisted widget slot (top-level widget or stack, with all
+     * of its children) that will never be attached to the grid, because
+     * MAX_COUNT was already reached when restoring. Unlike deleteStack(),
+     * this never touches the grid itself.
+     */
+    private void deleteWidgetSlot(Widget widget) {
+        if (widget.isStack) {
+            WidgetStack stack = loadStack(widget.id);
+
+            for (int childId : stack.children) {
+                requireWidgetHost().deleteAppWidgetId(childId);
+            }
+
+            widgetStackStore.edit().remove(String.valueOf(widget.id)).apply();
+        }
+
+        widgetStore.edit().remove(String.valueOf(widget.id)).apply();
+        requireWidgetHost().deleteAppWidgetId(widget.id);
+    }
+
+    private WidgetStack loadStack(int widgetId) {
+        String serial = widgetStackStore.getString(String.valueOf(widgetId), null);
+        WidgetStack stack = serial != null ? WidgetStack.deserialize(serial) : null;
+
+        return stack != null ? stack : new WidgetStack();
+    }
+
+    private void saveStack(int widgetId, WidgetStack stack) {
+        widgetStackStore.edit()
+                .putString(String.valueOf(widgetId), stack.serialize())
+                .apply();
     }
 
     private AppWidgetHostView createWidgetView(AppWidgetManager manager, Widget widget) {
