@@ -241,14 +241,15 @@ public class Launcher extends ThemedActivity {
 
             @Override
             public void onSwipe(TwoFingerSwipeGestureDetector.Direction direction) {
-                boolean handled = gestures.trigger(Launcher.this, direction);
-
-                // A two-finger swipe down with nothing assigned opens the
-                // Dashboard mini-sheet instead of being a no-op - deliberately
-                // NOT the one-finger swipe down that reveals the system
-                // notification shade, which is untouched by any of this.
-                if (!handled && direction == TwoFingerSwipeGestureDetector.Direction.DOWN) {
+                // DOWN is reserved for the Dashboard - not user-assignable
+                // (see GesturesDialog, which no longer offers it) - so it
+                // never goes through Gestures at all. Deliberately NOT the
+                // one-finger swipe down that reveals the system notification
+                // shade, which is untouched by any of this.
+                if (direction == TwoFingerSwipeGestureDetector.Direction.DOWN) {
                     controller.showSheet(SheetType.TOP_SHEET);
+                } else {
+                    gestures.trigger(Launcher.this, direction);
                 }
             }
 

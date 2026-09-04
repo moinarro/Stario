@@ -54,7 +54,8 @@ public class GesturesDialog extends ActionDialog {
         View root = inflater.inflate(R.layout.pop_up_gestures, null);
 
         setupRow(root, Direction.UP, R.id.gesture_up_container, R.id.gesture_up_app);
-        setupRow(root, Direction.DOWN, R.id.gesture_down_container, R.id.gesture_down_app);
+        // DOWN is intentionally absent here: it's hardcoded to always open the
+        // Dashboard (see Launcher.attachGestures()), not user-assignable.
         setupRow(root, Direction.LEFT, R.id.gesture_left_container, R.id.gesture_left_app);
         setupRow(root, Direction.RIGHT, R.id.gesture_right_container, R.id.gesture_right_app);
 

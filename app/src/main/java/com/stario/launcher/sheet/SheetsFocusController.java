@@ -168,24 +168,7 @@ public class SheetsFocusController extends ConstraintLayout {
 
         if (action == MotionEvent.ACTION_UP ||
                 action == MotionEvent.ACTION_CANCEL) {
-            // TOP_SHEET is special-cased: dragging down peeks at whatever is
-            // registered there (the Dashboard), but letting go always hands
-            // off to the real system notification shade instead of settling
-            // into an open sheet - the one-finger swipe down keeps behaving
-            // like it always did, and the peek is purely a preview.
-            if (sheetType == SheetType.TOP_SHEET) {
-                SheetWrapper topWrapper = wrappers[SheetType.TOP_SHEET.ordinal()];
-
-                if (topWrapper != null && topWrapper.dialogFragment.isAdded()) {
-                    topWrapper.dialogFragment.hide(true);
-                }
-
-                if (action == MotionEvent.ACTION_UP) {
-                    UiUtils.expandStatusBar(getContext());
-                }
-            } else {
-                dispatchSheetMotionEvent(MotionEvent.obtain(ev));
-            }
+            dispatchSheetMotionEvent(MotionEvent.obtain(ev));
 
             removeCheck();
 
@@ -481,6 +464,17 @@ public class SheetsFocusController extends ConstraintLayout {
             return;
         }
 
+        // The one-finger swipe down always reveals the system notification
+        // shade, exactly like before the Dashboard existed - the Dashboard
+        // is reachable only through the dedicated two-finger swipe down
+        // (see Launcher.attachGestures()), never through this one-finger
+        // drag, regardless of it being registered for TOP_SHEET.
+        if (type == SheetType.TOP_SHEET) {
+            UiUtils.expandStatusBar(getContext());
+
+            return;
+        }
+
         for (int index = 0; index < wrappers.length; index++) {
             if (index == type.ordinal()) {
                 continue;
@@ -508,8 +502,6 @@ public class SheetsFocusController extends ConstraintLayout {
             } else {
                 wrapper.show();
             }
-        } else if (type == SheetType.TOP_SHEET) {
-            UiUtils.expandStatusBar(getContext());
         }
     }
 
