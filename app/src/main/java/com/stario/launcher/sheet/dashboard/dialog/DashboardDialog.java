@@ -17,19 +17,32 @@
 
 package com.stario.launcher.sheet.dashboard.dialog;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.media.AudioAttributes;
+import android.media.MediaMetadata;
+import android.media.session.MediaController;
+import android.media.session.MediaSessionManager;
+import android.media.session.PlaybackState;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.stario.launcher.BuildConfig;
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.battery.Battery;
@@ -38,6 +51,8 @@ import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
 import com.stario.launcher.apps.RecentApps;
 import com.stario.launcher.preferences.Entry;
+import com.stario.launcher.preferences.Vibrations;
+import com.stario.launcher.services.NotificationService;
 import com.stario.launcher.sheet.SheetDialogFragment;
 import com.stario.launcher.sheet.SheetType;
 import com.stario.launcher.themes.ThemedActivity;
@@ -64,10 +79,17 @@ public class DashboardDialog extends SheetDialogFragment {
     private SharedPreferences recentAppsPreferences;
     private DashboardAppAdapter favoritesAdapter;
     private DashboardAppAdapter recentAdapter;
+    private MediaSessionManager mediaSessionManager;
+    private MediaController nowPlayingSession;
     private ThemedActivity activity;
     private ViewGroup placeholder;
     private View favoritesSection;
     private View recentSection;
+    private View nowPlayingCard;
+    private ImageView nowPlayingCover;
+    private ImageView nowPlayingPlayPause;
+    private TextView nowPlayingTitle;
+    private TextView nowPlayingArtist;
     private Battery battery;
     private Focus focus;
     private View root;
@@ -98,6 +120,8 @@ public class DashboardDialog extends SheetDialogFragment {
                 .getSharedPreferences(Entry.GLANCE_QUICK_APPS);
         this.recentAppsPreferences = activity.getApplicationContext()
                 .getSharedPreferences(Entry.RECENT_APPS);
+        this.mediaSessionManager = (MediaSessionManager)
+                activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
     }
 
     @Nullable
@@ -126,6 +150,46 @@ public class DashboardDialog extends SheetDialogFragment {
         View focusView = focus.inflate(activity, statusRow);
         focusView.setOnClickListener(focus.getClickListener());
         statusRow.addView(focusView);
+
+        nowPlayingCard = root.findViewById(R.id.now_playing_card);
+        nowPlayingCover = root.findViewById(R.id.now_playing_cover);
+        nowPlayingTitle = root.findViewById(R.id.now_playing_title);
+        nowPlayingArtist = root.findViewById(R.id.now_playing_artist);
+        nowPlayingPlayPause = root.findViewById(R.id.now_playing_play_pause);
+        ImageView nowPlayingPrevious = root.findViewById(R.id.now_playing_previous);
+        ImageView nowPlayingNext = root.findViewById(R.id.now_playing_next);
+
+        nowPlayingPlayPause.setOnClickListener(v -> {
+            if (nowPlayingSession == null) {
+                return;
+            }
+
+            Vibrations.getInstance().vibrate();
+
+            PlaybackState state = nowPlayingSession.getPlaybackState();
+
+            if (state != null && state.getState() == PlaybackState.STATE_PLAYING) {
+                nowPlayingSession.getTransportControls().pause();
+            } else {
+                nowPlayingSession.getTransportControls().play();
+            }
+
+            nowPlayingPlayPause.postDelayed(this::updateNowPlaying, 200);
+        });
+        nowPlayingPrevious.setOnClickListener(v -> {
+            if (nowPlayingSession != null) {
+                Vibrations.getInstance().vibrate();
+
+                nowPlayingSession.getTransportControls().skipToPrevious();
+            }
+        });
+        nowPlayingNext.setOnClickListener(v -> {
+            if (nowPlayingSession != null) {
+                Vibrations.getInstance().vibrate();
+
+                nowPlayingSession.getTransportControls().skipToNext();
+            }
+        });
 
         RecyclerView recyclerFavorites = root.findViewById(R.id.recycler_favorites);
         RecyclerView recyclerRecent = root.findViewById(R.id.recycler_recent);
@@ -195,6 +259,8 @@ public class DashboardDialog extends SheetDialogFragment {
             focus.update();
         }
 
+        updateNowPlaying();
+
         if (favoritesAdapter == null || recentAdapter == null) {
             return;
         }
@@ -210,6 +276,140 @@ public class DashboardDialog extends SheetDialogFragment {
 
         placeholder.setVisibility(favorites.isEmpty() && recent.isEmpty() ?
                 View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * A compact playback card - the same MediaSessionManager/NotificationService
+     * approach the Glance Media chip already uses (and the same "Do Not Disturb
+     * access"-style separate permission: notification listener access), just
+     * without that chip's popup/transition machinery, since this only needs to
+     * show current state and forward transport commands.
+     */
+    private void updateNowPlaying() {
+        if (nowPlayingCard == null || mediaSessionManager == null) {
+            return;
+        }
+
+        if (!NotificationManagerCompat.getEnabledListenerPackages(activity)
+                .contains(BuildConfig.APPLICATION_ID)) {
+            nowPlayingSession = null;
+            nowPlayingCard.setVisibility(View.GONE);
+
+            return;
+        }
+
+        List<MediaController> sessions;
+
+        try {
+            sessions = mediaSessionManager.getActiveSessions(
+                    new ComponentName(activity, NotificationService.class));
+        } catch (SecurityException exception) {
+            nowPlayingSession = null;
+            nowPlayingCard.setVisibility(View.GONE);
+
+            return;
+        }
+
+        MediaController candidate = null;
+
+        for (MediaController controller : sessions) {
+            PlaybackState state = controller.getPlaybackState();
+            AudioAttributes attrs = controller.getPlaybackInfo().getAudioAttributes();
+
+            if (attrs != null && attrs.getUsage() == AudioAttributes.USAGE_MEDIA &&
+                    state != null && state.getState() == PlaybackState.STATE_PLAYING &&
+                    hasTitle(controller.getMetadata())) {
+                candidate = controller;
+
+                break;
+            }
+        }
+
+        // Nothing actively playing - fall back to any paused session with
+        // valid metadata, so a track paused on the way in still shows up
+        // here (and can be resumed) instead of the card just vanishing.
+        if (candidate == null) {
+            for (MediaController controller : sessions) {
+                AudioAttributes attrs = controller.getPlaybackInfo().getAudioAttributes();
+
+                if (attrs != null && attrs.getUsage() == AudioAttributes.USAGE_MEDIA &&
+                        hasTitle(controller.getMetadata())) {
+                    candidate = controller;
+
+                    break;
+                }
+            }
+        }
+
+        nowPlayingSession = candidate;
+
+        if (candidate == null) {
+            nowPlayingCard.setVisibility(View.GONE);
+
+            return;
+        }
+
+        MediaMetadata metadata = candidate.getMetadata();
+
+        String title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE);
+        nowPlayingTitle.setText(title != null ? title.trim() : "");
+
+        String artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST);
+        nowPlayingArtist.setText(artist != null && !artist.isBlank() ?
+                artist.trim() : activity.getResources().getString(R.string.unknown_artist));
+
+        PlaybackState state = candidate.getPlaybackState();
+        boolean isPlaying = state != null && state.getState() == PlaybackState.STATE_PLAYING;
+        nowPlayingPlayPause.setImageResource(isPlaying ?
+                R.drawable.ic_media_pause : R.drawable.ic_media_play);
+
+        updateCover(metadata);
+
+        nowPlayingCard.setVisibility(View.VISIBLE);
+    }
+
+    private boolean hasTitle(MediaMetadata metadata) {
+        if (metadata == null) {
+            return false;
+        }
+
+        String title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE);
+
+        return title != null && !title.isEmpty();
+    }
+
+    private void updateCover(MediaMetadata metadata) {
+        String coverUri = metadata.getString(MediaMetadata.METADATA_KEY_ART_URI);
+
+        if (coverUri == null || coverUri.isBlank()) {
+            coverUri = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
+        }
+
+        if (coverUri == null || coverUri.isBlank()) {
+            coverUri = metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI);
+        }
+
+        if (coverUri != null && !coverUri.isBlank()) {
+            Glide.with(activity).load(Uri.parse(coverUri)).into(nowPlayingCover);
+
+            return;
+        }
+
+        Bitmap bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
+
+        if (bitmap == null) {
+            bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+        }
+
+        if (bitmap == null) {
+            bitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+        }
+
+        if (bitmap != null) {
+            Glide.with(activity).load(bitmap).into(nowPlayingCover);
+        } else {
+            nowPlayingCover.setImageDrawable(null);
+        }
     }
 
     private List<String> filterInstalled(List<String> packages) {
