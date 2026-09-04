@@ -45,6 +45,7 @@ import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.M
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
 import com.stario.launcher.activities.settings.dialogs.apps.QuickAppsDialog;
+import com.stario.launcher.activities.settings.dialogs.dashboard.DashboardSettingsDialog;
 import com.stario.launcher.activities.settings.dialogs.widgets.WidgetScheduleDialog;
 import com.stario.launcher.activities.settings.dialogs.gestures.GesturesDialog;
 import com.stario.launcher.activities.settings.dialogs.location.LocationDialog;
@@ -228,6 +229,26 @@ public class HomeScreenDialog extends ActionDialog {
             public void onClick(View view) {
                 if (dialog == null) {
                     dialog = new WidgetScheduleDialog(activity);
+                    dialog.setOnDismissListener(d -> showing = false);
+                }
+
+                if (!showing) {
+                    dialog.show();
+                    showing = true;
+                }
+            }
+        });
+
+        // Dashboard (TOP_SHEET, reached with a two-finger swipe down) -
+        // which of its pages are enabled and which one it opens on
+        root.findViewById(R.id.dashboard_container).setOnClickListener(new View.OnClickListener() {
+            private DashboardSettingsDialog dialog;
+            private boolean showing = false;
+
+            @Override
+            public void onClick(View view) {
+                if (dialog == null) {
+                    dialog = new DashboardSettingsDialog(activity);
                     dialog.setOnDismissListener(d -> showing = false);
                 }
 

@@ -17,6 +17,7 @@
 
 package com.stario.launcher.sheet.dashboard.dialog;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -47,6 +48,7 @@ import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.focus.Focus;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.RecentMedia;
+import com.stario.launcher.activities.settings.dialogs.NotificationConfigurator;
 import com.stario.launcher.activities.settings.dialogs.gestures.GestureAppPickerDialog;
 import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
@@ -56,6 +58,7 @@ import com.stario.launcher.preferences.Vibrations;
 import com.stario.launcher.services.NotificationService;
 import com.stario.launcher.sheet.SheetDialogFragment;
 import com.stario.launcher.sheet.SheetType;
+import com.stario.launcher.sheet.dashboard.dialog.DashboardPages.Page;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
 import com.stario.launcher.ui.common.FadingEdgeLayout;
@@ -72,8 +75,12 @@ import java.util.List;
  * Launcher.attachGestures()) - the one-finger swipe down that reveals the
  * system notification shade is untouched by any of this.
  * <p>
- * Two tabs, swiped between manually (CenterTabLayout + a plain View-backed
- * PagerAdapter - see DashboardPagerAdapter):
+ * Up to three tabs, swiped between manually (CenterTabLayout + a plain
+ * View-backed PagerAdapter - see DashboardPagerAdapter) - which of them
+ * are enabled and which one this dialog opens on are both configurable
+ * from DashboardSettingsDialog (see DashboardPages for the preferences
+ * themselves); at least one always stays enabled, so this dialog never
+ * has nowhere to land:
  * <ul>
  *     <li>Inicio: a DND toggle, "Favoritos" (GlanceQuickApps' curated
  *     list), "Apps más usadas" (UsageAccess, gated behind the special
@@ -89,6 +96,10 @@ import java.util.List;
  *     user-curated row of media app shortcuts (DashboardMediaApps) -
  *     editable directly here, since unlike Favoritos there's nowhere
  *     else for it to be edited.</li>
+ *     <li>Utilidades: "Agenda de hoy" (TodayAgenda, behind the ordinary
+ *     READ_CALENDAR runtime permission) and a "Notificaciones" summary
+ *     by app (NotificationsSummary, reusing the same notification
+ *     listener access Now Playing already depends on).</li>
  * </ul>
  */
 public class DashboardDialog extends SheetDialogFragment {
@@ -96,11 +107,14 @@ public class DashboardDialog extends SheetDialogFragment {
     private SharedPreferences recentAppsPreferences;
     private SharedPreferences mediaAppsPreferences;
     private SharedPreferences recentMediaPreferences;
+    private SharedPreferences dashboardSettingsPreferences;
     private DashboardAppAdapter favoritesAdapter;
     private DashboardAppAdapter recentAdapter;
     private DashboardAppAdapter mostUsedAdapter;
     private DashboardAppAdapter mediaAppsAdapter;
     private RecentMediaAdapter mediaHistoryAdapter;
+    private AgendaAdapter agendaAdapter;
+    private NotificationsSummaryAdapter notificationsAdapter;
     private MediaSessionManager mediaSessionManager;
     private MediaController nowPlayingSession;
     private ThemedActivity activity;
@@ -116,6 +130,13 @@ public class DashboardDialog extends SheetDialogFragment {
     private ImageView nowPlayingPlayPause;
     private TextView nowPlayingTitle;
     private TextView nowPlayingArtist;
+    private View agendaPermissionPrompt;
+    private TextView agendaPermissionText;
+    private TextView agendaEmpty;
+    private RecyclerView recyclerAgenda;
+    private View notificationsPermissionPrompt;
+    private TextView notificationsEmpty;
+    private RecyclerView recyclerNotifications;
     private Focus focus;
     private View root;
 
@@ -149,6 +170,8 @@ public class DashboardDialog extends SheetDialogFragment {
                 .getSharedPreferences(Entry.DASHBOARD_MEDIA_APPS);
         this.recentMediaPreferences = activity.getApplicationContext()
                 .getSharedPreferences(Entry.RECENT_MEDIA);
+        this.dashboardSettingsPreferences = activity.getApplicationContext()
+                .getSharedPreferences(Entry.DASHBOARD_SETTINGS);
         this.mediaSessionManager = (MediaSessionManager)
                 activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
     }
@@ -164,22 +187,47 @@ public class DashboardDialog extends SheetDialogFragment {
         CenterTabLayout tabs = root.findViewById(R.id.tabs);
         CustomDurationViewPager pager = root.findViewById(R.id.pager);
 
-        View pageHome = inflater.inflate(R.layout.dashboard_page_home, pager, false);
-        View pageMedia = inflater.inflate(R.layout.dashboard_page_media, pager, false);
-
-        setupHomePage(pageHome);
-        setupMediaPage(pageMedia);
+        // Only the pages the user has kept enabled (see DashboardSettingsDialog)
+        // get inflated at all - in DashboardPages.Page's fixed order (Inicio,
+        // Multimedia, Utilidades) regardless of which ones are actually
+        // present, so toggling one off never reorders the rest.
+        List<Page> enabledPages = DashboardPages.getEnabledPages(dashboardSettingsPreferences);
 
         List<View> pages = new ArrayList<>();
-        pages.add(pageHome);
-        pages.add(pageMedia);
-
         List<CharSequence> titles = new ArrayList<>();
-        titles.add(activity.getResources().getString(R.string.dashboard_home));
-        titles.add(activity.getResources().getString(R.string.dashboard_media));
+        int defaultIndex = 0;
+        Page defaultPage = DashboardPages.getDefault(dashboardSettingsPreferences);
+
+        for (Page page : enabledPages) {
+            View pageView;
+
+            switch (page) {
+                case MULTIMEDIA:
+                    pageView = inflater.inflate(R.layout.dashboard_page_media, pager, false);
+                    setupMediaPage(pageView);
+                    break;
+                case UTILITIES:
+                    pageView = inflater.inflate(R.layout.dashboard_page_utilities, pager, false);
+                    setupUtilitiesPage(pageView);
+                    break;
+                case HOME:
+                default:
+                    pageView = inflater.inflate(R.layout.dashboard_page_home, pager, false);
+                    setupHomePage(pageView);
+                    break;
+            }
+
+            if (page == defaultPage) {
+                defaultIndex = pages.size();
+            }
+
+            pages.add(pageView);
+            titles.add(activity.getResources().getString(page.titleRes));
+        }
 
         pager.setAdapter(new DashboardPagerAdapter(pages, titles));
         tabs.setViewPager(pager);
+        pager.setCurrentItem(defaultIndex, false);
 
         Measurements.addStatusBarListener(value -> {
             fader.setFadeSizes(value, 0, Measurements.getNavHeight(), 0);
@@ -347,6 +395,50 @@ public class DashboardDialog extends SheetDialogFragment {
         recyclerMediaApps.setAdapter(mediaAppsAdapter);
     }
 
+    private void setupUtilitiesPage(View page) {
+        agendaPermissionPrompt = page.findViewById(R.id.agenda_permission_prompt);
+        agendaPermissionText = page.findViewById(R.id.agenda_permission_text);
+        agendaEmpty = page.findViewById(R.id.agenda_empty);
+        recyclerAgenda = page.findViewById(R.id.recycler_agenda);
+
+        recyclerAgenda.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.VERTICAL, false));
+        agendaAdapter = new AgendaAdapter(activity, new ArrayList<>());
+        recyclerAgenda.setAdapter(agendaAdapter);
+
+        // READ_CALENDAR is an ordinary dangerous permission (not a special
+        // Settings-screen access like Focus/Usage Access), so a direct
+        // system request is enough - same as Weather's precise-location
+        // request (see LocationRecyclerAdapter).
+        agendaPermissionPrompt.setOnClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            activity.requestPermissions(new String[]{Manifest.permission.READ_CALENDAR},
+                    grantResults -> refreshAgenda());
+        });
+
+        notificationsPermissionPrompt = page.findViewById(R.id.notifications_permission_prompt);
+        notificationsEmpty = page.findViewById(R.id.notifications_empty);
+        recyclerNotifications = page.findViewById(R.id.recycler_notifications);
+
+        recyclerNotifications.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.VERTICAL, false));
+        notificationsAdapter = new NotificationsSummaryAdapter(activity, new ArrayList<>());
+        recyclerNotifications.setAdapter(notificationsAdapter);
+
+        // Notification listener access already has its own explainer
+        // dialog (NotificationConfigurator, used the same way by the
+        // Media Player toggle in HomeScreenDialog) - reused here rather
+        // than building a second one for the same permission.
+        notificationsPermissionPrompt.setOnClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            NotificationConfigurator dialog = new NotificationConfigurator(activity);
+            dialog.setOnDismissListener(d -> refreshNotifications());
+            dialog.show();
+        });
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -371,6 +463,8 @@ public class DashboardDialog extends SheetDialogFragment {
         updateNowPlaying();
         refreshMediaApps();
         refreshMediaHistory();
+        refreshAgenda();
+        refreshNotifications();
 
         if (favoritesAdapter == null || recentAdapter == null) {
             return;
@@ -448,6 +542,61 @@ public class DashboardDialog extends SheetDialogFragment {
 
         mediaHistoryAdapter.setTracks(tracks);
         historySection.setVisibility(tracks.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * "Agenda de hoy" - needs the ordinary READ_CALENDAR permission (see
+     * TodayAgenda), so like Apps más usadas this section doubles as its
+     * own onboarding: a prompt row until granted, the actual events once
+     * it is, and a plain empty-state message on a day with nothing on it
+     * (as opposed to the prompt, which only shows when access is missing).
+     */
+    private void refreshAgenda() {
+        if (agendaAdapter == null) {
+            return;
+        }
+
+        if (!TodayAgenda.isGranted(activity)) {
+            agendaPermissionText.setText(R.string.dashboard_calendar_access_prompt);
+            agendaPermissionPrompt.setVisibility(View.VISIBLE);
+            agendaEmpty.setVisibility(View.GONE);
+            recyclerAgenda.setVisibility(View.GONE);
+
+            return;
+        }
+
+        List<TodayAgenda.Event> events = TodayAgenda.getTodayEvents(activity);
+        agendaAdapter.setEvents(events);
+
+        agendaPermissionPrompt.setVisibility(View.GONE);
+        agendaEmpty.setVisibility(events.isEmpty() ? View.VISIBLE : View.GONE);
+        recyclerAgenda.setVisibility(events.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * "Notificaciones" - reuses notification listener access, the same
+     * permission Now Playing and Media already depend on, so a user who
+     * granted it for either of those gets this section for free.
+     */
+    private void refreshNotifications() {
+        if (notificationsAdapter == null) {
+            return;
+        }
+
+        if (!NotificationsSummary.isGranted(activity)) {
+            notificationsPermissionPrompt.setVisibility(View.VISIBLE);
+            notificationsEmpty.setVisibility(View.GONE);
+            recyclerNotifications.setVisibility(View.GONE);
+
+            return;
+        }
+
+        List<NotificationsSummary.Entry> entries = NotificationsSummary.getSummary(activity);
+        notificationsAdapter.setEntries(entries);
+
+        notificationsPermissionPrompt.setVisibility(View.GONE);
+        notificationsEmpty.setVisibility(entries.isEmpty() ? View.VISIBLE : View.GONE);
+        recyclerNotifications.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     /**
