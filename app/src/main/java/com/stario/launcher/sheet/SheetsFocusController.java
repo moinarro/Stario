@@ -305,6 +305,20 @@ public class SheetsFocusController extends ConstraintLayout {
         return sheetType != null && dispatchedMoveEvent;
     }
 
+    /**
+     * Reveal a sheet programmatically (no drag involved) - e.g. a Glance
+     * chip's tap action jumping straight into Briefing. A no-op if that
+     * sheet type was never registered via addSheetDialog(), or is already
+     * showing.
+     */
+    public void showSheet(@NonNull SheetType type) {
+        SheetWrapper wrapper = wrappers[type.ordinal()];
+
+        if (wrapper != null) {
+            wrapper.show();
+        }
+    }
+
     private class CheckForLongPress implements Runnable {
         private final int mOriginalWindowAttachCount;
 
