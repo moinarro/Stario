@@ -55,12 +55,21 @@ public class WidgetContainer extends RelativeLayout implements Comparable<Widget
             // report, so - unlike a plain widget - nothing else forces it
             // to fill this container; without explicit MATCH_PARENT params
             // it would shrink to RelativeLayout's WRAP_CONTENT default.
-            // Handed to addView() here (rather than set on the still-
-            // unparented view by WidgetStackView itself) since
-            // View.setLayoutParams() on a view with no parent yet crashes
-            // on some newer Android versions.
-            addView(host, new RelativeLayout.LayoutParams(
-                    RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+            //
+            // Adding it here directly - even via addView(host, params),
+            // which still ends up calling host.setLayoutParams() - crashes
+            // with a NullPointerException in ViewGroup.resolveLayoutParams()
+            // on some newer Android versions. That method appears to walk
+            // host's already-inflated child hierarchy (recycler, dots, ...)
+            // to resolve layout direction, and something in that walk isn't
+            // safe yet before this container is attached to a window.
+            // Deferring the actual addView() to post() - which runs once
+            // this container is attached, queuing itself otherwise - avoids
+            // it entirely, since a plain top-level widget (whose
+            // AppWidgetHostView has no children yet at this point) never
+            // hits this path in the first place.
+            post(() -> addView(host, new RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT)));
         } else {
             addView(host);
         }
