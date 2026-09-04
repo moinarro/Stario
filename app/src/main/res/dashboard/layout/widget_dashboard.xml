@@ -51,7 +51,6 @@
                 app:stl_distributeEvenly="true"
                 app:stl_dividerThickness="0dp"
                 app:stl_drawDecorationAfterTab="false"
-                app:stl_indicatorAlwaysInCenter="true"
                 app:stl_indicatorColor="?attr/colorPrimaryContainer"
                 app:stl_indicatorCornerRadius="24dp"
                 app:stl_indicatorGravity="center"
