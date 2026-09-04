@@ -35,6 +35,13 @@ public class WidgetStack {
     @SerializedName("children")
     public List<Integer> children;
 
+    // Optional, user-set label shown in the stack's header. Null/blank
+    // means "no custom name" - existing, previously-saved stacks simply
+    // deserialize with this null (Gson leaves missing fields at their
+    // default), so nothing needs migrating.
+    @SerializedName("name")
+    public String name;
+
     public WidgetStack() {
         this.children = new ArrayList<>();
     }

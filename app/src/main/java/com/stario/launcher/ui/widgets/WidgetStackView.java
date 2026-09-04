@@ -19,21 +19,27 @@ package com.stario.launcher.ui.widgets;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.color.MaterialColors;
 import com.stario.launcher.R;
+import com.stario.launcher.ui.Measurements;
 
 import java.util.List;
 
@@ -51,11 +57,20 @@ import java.util.List;
  */
 @SuppressLint("ViewConstructor")
 public class WidgetStackView extends FrameLayout {
+    // Above this many children, dots would either overflow the header or
+    // become too small to tap reliably - fall back to the plain "x / y"
+    // text instead of trying to cram that many dots in.
+    private static final int MAX_DOTS = 8;
+
     private final List<Integer> children;
     private final Callback callback;
     private final ChildAdapter adapter;
+    private final TextView nameView;
     private final TextView pageIndicator;
+    private final LinearLayout dots;
     private final RecyclerView recycler;
+    private final LinearLayoutManager layoutManager;
+    private final PagerSnapHelper snapHelper;
 
     public WidgetStackView(Context context, List<Integer> children, Callback callback) {
         super(context);
@@ -75,12 +90,14 @@ public class WidgetStackView extends FrameLayout {
         View root = LayoutInflater.from(context)
                 .inflate(R.layout.widget_stack_container, this, true);
 
+        nameView = root.findViewById(R.id.name);
         pageIndicator = root.findViewById(R.id.page_indicator);
+        dots = root.findViewById(R.id.dots);
         recycler = root.findViewById(R.id.recycler);
 
-        LinearLayoutManager manager = new LinearLayoutManager(context,
+        layoutManager = new LinearLayoutManager(context,
                 LinearLayoutManager.HORIZONTAL, false);
-        recycler.setLayoutManager(manager);
+        recycler.setLayoutManager(layoutManager);
         recycler.setItemAnimator(null);
 
         // The stack lives inside the widgets sheet, which is itself
@@ -120,7 +137,8 @@ public class WidgetStackView extends FrameLayout {
             }
         });
 
-        new PagerSnapHelper().attachToRecyclerView(recycler);
+        snapHelper = new PagerSnapHelper();
+        snapHelper.attachToRecyclerView(recycler);
 
         adapter = new ChildAdapter();
         recycler.setAdapter(adapter);
@@ -128,12 +146,12 @@ public class WidgetStackView extends FrameLayout {
         recycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView view, int dx, int dy) {
-                updatePageIndicator(manager);
+                updatePageIndicator();
             }
         });
 
         setOnHeaderLongClickListener(null);
-        updatePageIndicator(manager);
+        updatePageIndicator();
     }
 
     public void setOnHeaderLongClickListener(OnLongClickListener listener) {
@@ -144,33 +162,115 @@ public class WidgetStackView extends FrameLayout {
     }
 
     /**
+     * Shows the given label in the header, or hides it entirely when null
+     * or blank so the plain dot/page indicator gets the header's full
+     * width, matching a stack that was never renamed.
+     */
+    public void setName(@Nullable String name) {
+        if (TextUtils.isEmpty(name)) {
+            nameView.setVisibility(GONE);
+            nameView.setText(null);
+        } else {
+            nameView.setText(name);
+            nameView.setVisibility(VISIBLE);
+        }
+    }
+
+    /**
+     * Number of real widgets currently in the stack (the trailing "add"
+     * page doesn't count).
+     */
+    public int getChildCount() {
+        return children.size();
+    }
+
+    /**
+     * Snap directly to the page at {@code index} (clamped into range),
+     * animating the same way a manual swipe would settle. Used by both the
+     * tappable page dots and a two-finger jump-to-first/last gesture.
+     */
+    public void scrollToPage(int index) {
+        if (children.isEmpty()) {
+            return;
+        }
+
+        int target = Math.max(0, Math.min(index, children.size() - 1));
+
+        recycler.smoothScrollToPosition(target);
+    }
+
+    /**
      * Call after the children list changes (a child was added or removed)
      * to refresh the carousel and the page indicator.
      */
     public void notifyChildrenChanged() {
         adapter.notifyDataSetChanged();
-        updatePageIndicator((LinearLayoutManager) recycler.getLayoutManager());
+        updatePageIndicator();
     }
 
-    private void updatePageIndicator(LinearLayoutManager manager) {
-        if (pageIndicator == null || manager == null || children.isEmpty()) {
-            if (pageIndicator != null) {
-                pageIndicator.setText("");
-            }
+    private void updatePageIndicator() {
+        if (children.isEmpty()) {
+            pageIndicator.setVisibility(GONE);
+            dots.setVisibility(GONE);
 
             return;
         }
 
-        int position = manager.findFirstVisibleItemPosition();
+        int position = layoutManager.findFirstVisibleItemPosition();
 
         if (position < 0) {
             return;
         }
 
-        int page = Math.min(position, children.size() - 1) + 1;
+        int page = Math.min(position, children.size() - 1);
 
-        pageIndicator.setText(getContext().getString(R.string.widget_stack_page_count,
-                page, children.size()));
+        if (children.size() > MAX_DOTS) {
+            dots.setVisibility(GONE);
+            pageIndicator.setVisibility(VISIBLE);
+
+            pageIndicator.setText(getContext().getString(R.string.widget_stack_page_count,
+                    page + 1, children.size()));
+        } else {
+            pageIndicator.setVisibility(GONE);
+
+            updateDots(page);
+        }
+    }
+
+    private void updateDots(int selected) {
+        if (dots.getChildCount() != children.size()) {
+            dots.removeAllViews();
+
+            int size = Measurements.dpToPx(6);
+            int margin = Measurements.dpToPx(2);
+
+            for (int index = 0; index < children.size(); index++) {
+                View dot = new View(getContext());
+
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+                params.setMargins(margin, 0, margin, 0);
+                dot.setLayoutParams(params);
+
+                int page = index;
+                dot.setOnClickListener(v -> scrollToPage(page));
+
+                dots.addView(dot);
+            }
+        }
+
+        for (int index = 0; index < dots.getChildCount(); index++) {
+            View dot = dots.getChildAt(index);
+
+            GradientDrawable background = new GradientDrawable();
+            background.setShape(GradientDrawable.OVAL);
+            background.setColor(MaterialColors.getColor(dot,
+                    com.google.android.material.R.attr.colorOnSurface));
+
+            dot.setBackground(background);
+            dot.setAlpha(index == selected ? 0.9f : 0.3f);
+        }
+
+        dots.setVisibility(VISIBLE);
     }
 
     private class ChildAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {

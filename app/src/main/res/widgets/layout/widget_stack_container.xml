@@ -36,15 +36,37 @@
             android:src="@drawable/ic_add_page" />
 
         <TextView
-            android:id="@+id/page_indicator"
+            android:id="@+id/name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:alpha="0.6"
+            android:ellipsize="end"
+            android:fontFamily="@font/dm_sans_medium"
+            android:maxLines="1"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/dots"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/page_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:gravity="end"
             android:alpha="0.6"
             android:fontFamily="@font/dm_sans_medium"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="11sp" />
+            android:textSize="11sp"
+            android:visibility="gone" />
 
     </LinearLayout>
 

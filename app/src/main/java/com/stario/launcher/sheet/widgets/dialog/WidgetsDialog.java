@@ -51,6 +51,7 @@ import com.stario.launcher.sheet.widgets.Widget;
 import com.stario.launcher.sheet.widgets.WidgetSize;
 import com.stario.launcher.sheet.widgets.WidgetStack;
 import com.stario.launcher.sheet.widgets.configurator.WidgetConfigurator;
+import com.stario.launcher.sheet.widgets.dialog.RenameStackDialog;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
 import com.stario.launcher.ui.common.FadingEdgeLayout;
@@ -452,6 +453,8 @@ public class WidgetsDialog extends SheetDialogFragment {
             }
         });
 
+        view.setName(stack.name);
+
         view.setOnHeaderLongClickListener(v -> {
             showStackOptionsMenu(view, widget);
 
@@ -575,6 +578,17 @@ public class WidgetsDialog extends SheetDialogFragment {
         }
     }
 
+    private void renameStack(WidgetStackView view, Widget widget) {
+        WidgetStack stack = loadStack(widget.id);
+
+        new RenameStackDialog(activity, stack.name, name -> {
+            stack.name = name;
+            saveStack(widget.id, stack);
+
+            view.setName(name);
+        }).show();
+    }
+
     private void showStackOptionsMenu(WidgetStackView view, Widget widget) {
         Vibrations.getInstance().vibrate();
 
@@ -584,6 +598,11 @@ public class WidgetsDialog extends SheetDialogFragment {
         menu.add(new PopupMenu.Item(resources.getString(R.string.remove),
                 AppCompatResources.getDrawable(activity, R.drawable.ic_delete),
                 v -> deleteStack(view, widget))
+        );
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.rename),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_edit),
+                v -> renameStack(view, widget))
         );
 
         menu.add(new PopupMenu.Item(resources.getString(R.string.create_a_widget),
