@@ -83,18 +83,25 @@ public class WidgetStackView extends FrameLayout {
     public WidgetStackView(Context context, List<Integer> children, Callback callback) {
         super(context);
 
-        // ViewGroup.addViewInner() only calls child.resetRtlProperties() -
-        // whose ViewGroup override crashes with a NullPointerException on
-        // this Android build, see WidgetContainer's addViewInLayout() call -
-        // when the child's own isLayoutDirectionInherited() is true, which
-        // it is by default (LAYOUT_DIRECTION_INHERIT). Explicitly resolving
-        // this view's own direction up front means that guard is false, so
-        // that whole call is skipped for this view entirely, regardless of
-        // what's actually null inside it.
-        setLayoutDirection(LAYOUT_DIRECTION_LOCALE);
-
+        // Assign these before anything else in this constructor: this
+        // class's own getChildCount() override reads `children`, and
+        // Android's internal layout/RTL-resolution machinery calls
+        // getChildCount() on a ViewGroup as part of adding/modifying it -
+        // including, as it turns out, from inside setLayoutDirection()
+        // itself below. Every earlier crash chasing a supposed framework
+        // NullPointerException was really just this: `children` still
+        // being null when that machinery called back into our own
+        // getChildCount() override.
         this.children = children;
         this.callback = callback;
+
+        // ViewGroup.addViewInner() calls child.resetRtlProperties() -
+        // whose ViewGroup override walks the child's own children via
+        // getChildCount() - whenever the child's isLayoutDirectionInherited()
+        // is true, which it is by default. Explicitly resolving this view's
+        // own direction up front means that guard is false, so that whole
+        // walk is skipped once this view is actually added elsewhere.
+        setLayoutDirection(LAYOUT_DIRECTION_LOCALE);
 
         // Adding a ViewGroup that already has real child views (this one's
         // recycler/dots/name header, once inflated) to a fresh parent
@@ -302,10 +309,14 @@ public class WidgetStackView extends FrameLayout {
 
     /**
      * Number of real widgets currently in the stack (the trailing "add"
-     * page doesn't count).
+     * page doesn't count). Overrides ViewGroup's own getChildCount() (real
+     * attached child views), which Android's internal view-tree machinery
+     * can call on this object before the constructor has finished - see
+     * the comment at the top of the constructor - hence the null guard.
      */
+    @Override
     public int getChildCount() {
-        return children.size();
+        return children != null ? children.size() : 0;
     }
 
     /**
