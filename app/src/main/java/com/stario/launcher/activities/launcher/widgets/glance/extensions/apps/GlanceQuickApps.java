@@ -112,6 +112,18 @@ public class GlanceQuickApps {
     }
 
     private List<String> load() {
+        return getPackages(preferences);
+    }
+
+    /**
+     * The curated app list itself, read the same static way as
+     * getIconSize()/getRows()/getScrollMode() below - lets other features
+     * (the Dashboard's "favorites" section) read this same
+     * individually-curated list without needing a live GlanceQuickApps
+     * instance (which owns a whole popup lifecycle this has nothing to do
+     * with).
+     */
+    public static List<String> getPackages(SharedPreferences preferences) {
         String json = preferences.getString(APPS_KEY, null);
 
         if (json == null) {
@@ -126,7 +138,7 @@ public class GlanceQuickApps {
 
             return stored != null ? new ArrayList<>(stored) : new ArrayList<>();
         } catch (Exception exception) {
-            Log.e(TAG, "load: failed to parse stored quick apps", exception);
+            Log.e(TAG, "getPackages: failed to parse stored quick apps", exception);
 
             return new ArrayList<>();
         }

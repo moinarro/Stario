@@ -26,6 +26,7 @@ import android.os.UserHandle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.stario.launcher.preferences.Entry;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.utils.Utils;
 
@@ -62,6 +63,12 @@ public class LauncherApplication implements Comparable<LauncherApplication> {
             activity.getSystemService(LauncherApps.class)
                     .startMainActivity(info.getComponentName(),
                             handle, null, null);
+
+            // The single choke point every real launch - drawer, search,
+            // gestures, Dashboard itself - already goes through, so this is
+            // the one place "recently launched" needs to be recorded.
+            RecentApps.recordLaunch(activity.getApplicationContext()
+                    .getSharedPreferences(Entry.RECENT_APPS), this.info.packageName);
         }
     }
 
