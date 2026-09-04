@@ -77,9 +77,17 @@ public final class Calendar implements GlanceViewExtension {
             long time = android.icu.util.Calendar.getInstance().getTime().getTime();
             Locale locale = month.getTextLocale();
 
+            // Abbreviated ("Fri," not "Friday,") rather than the full
+            // weekday name - this chip shares its row with however many
+            // other Glance chips the user has enabled (notifications,
+            // battery, media, weather...), each of them fixed-width, so
+            // the full name can run out of the flexible space left over
+            // and get ellipsized to something like "Fri..." - a short,
+            // reliably-fitting format avoids that entirely instead of
+            // just truncating more gracefully.
             month.post(() -> month.setText(
                             Casing.toTitleCase(
-                                    new SimpleDateFormat("EEEE, ",
+                                    new SimpleDateFormat("EEE, ",
                                             locale).format(time))
                     )
             );
