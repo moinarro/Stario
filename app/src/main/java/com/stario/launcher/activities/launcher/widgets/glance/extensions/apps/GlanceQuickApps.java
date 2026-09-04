@@ -292,44 +292,22 @@ public class GlanceQuickApps {
         recycler.setAdapter(adapter);
         updateEmptyState(empty);
 
-        // Kept invisible until the layout below has actually settled at its
-        // target scroll position (see the post() a few lines down) - masks
-        // the brief window, right after attaching the adapter and jumping
-        // to that position, where RecyclerView/GridLayoutManager is still
-        // reconciling intermediate view states and would otherwise be
-        // visible mid-shuffle for a frame or two, reading as a flicker.
-        if (infinite) {
-            recycler.setVisibility(View.INVISIBLE);
-        }
-
-        if (infinite) {
-            // Wraps around indefinitely (the adapter reports Integer.MAX_VALUE
-            // items and maps position -> real index via modulo), so start
-            // some way in, aligned to both a row boundary and a full loop of
-            // the real list, to allow scrolling freely in either direction
-            // without ever hitting an edge.
-            //
-            // Deliberately NOT a huge jump, despite the adapter itself
-            // reporting Integer.MAX_VALUE items: scrollToPosition() to a far
-            // starting index makes RecyclerView/GridLayoutManager measure and
-            // bind through a chain of intermediate view states while it
-            // settles into that position (worse with a multi-row grid, since
-            // there's more to lay out per pass), which is visible as the
-            // real icons flashing past in rapid succession right after the
-            // popup opens - reading as flicker even though nothing is
-            // actually broken. A handful of loops of the real list is
-            // already far more headroom than a user swiping a small popup
-            // will ever reach in either direction, so keep the jump tiny.
-            long block = (long) rows * packages.size();
-            int startPosition = (int) Math.min(block * 4, Integer.MAX_VALUE);
-
-            manager.scrollToPosition(startPosition);
-
-            recycler.post(() -> recycler.setVisibility(View.VISIBLE));
-
-            if (scrollMode == ScrollMode.CONTINUOUS) {
-                attachAutoScroll(recycler);
-            }
+        // No artificial scrollToPosition() jump on open - a screen recording
+        // showed why that was a bad idea: whatever starting index is chosen,
+        // RecyclerView/GridLayoutManager needs one or more real frames to
+        // settle a horizontal multi-row grid onto it, and since the adapter
+        // maps position -> real app via modulo, each of those transitional
+        // frames can anchor on a slightly different position and so render
+        // a different subset/order of the real apps - visible as the icons
+        // rapidly reshuffling right after the popup opens, not a fade or a
+        // blank frame, which is exactly what the recording showed. Starting
+        // at the RecyclerView's natural position 0 needs no settling at
+        // all - one deterministic layout pass, nothing to reshuffle -  at
+        // the cost of only supporting the infinite wrap going forward
+        // (swiping backward from the very first open just stops at the
+        // start, same as any ordinary feed that only loops one way).
+        if (infinite && scrollMode == ScrollMode.CONTINUOUS) {
+            attachAutoScroll(recycler);
         }
 
         popupWindow = new PopupWindow(content, width, ViewGroup.LayoutParams.WRAP_CONTENT, true);
