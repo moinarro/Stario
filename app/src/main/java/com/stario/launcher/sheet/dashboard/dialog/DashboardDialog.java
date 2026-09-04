@@ -45,8 +45,8 @@ import com.bumptech.glide.Glide;
 import com.stario.launcher.BuildConfig;
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
-import com.stario.launcher.activities.launcher.widgets.glance.extensions.battery.Battery;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.focus.Focus;
+import com.stario.launcher.activities.settings.dialogs.gestures.GestureAppPickerDialog;
 import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
 import com.stario.launcher.apps.RecentApps;
@@ -58,6 +58,8 @@ import com.stario.launcher.sheet.SheetType;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
 import com.stario.launcher.ui.common.FadingEdgeLayout;
+import com.stario.launcher.ui.common.pager.CustomDurationViewPager;
+import com.stario.launcher.ui.common.tabs.CenterTabLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,20 +67,30 @@ import java.util.List;
 /**
  * A small "mini-dashboard" occupying TOP_SHEET, the one sheet slot nothing
  * else claims by default (see SheetType.getDefaultSheetTypeForSheetDialogFragment).
- * Reached without touching the one-finger swipe-down that reveals the
- * system notification shade - see Launcher.attachGestures(), which opens
- * this only as a fallback when a two-finger swipe DOWN has nothing assigned
- * in Gestures.
+ * Reached only through the dedicated two-finger swipe down (see
+ * Launcher.attachGestures()) - the one-finger swipe down that reveals the
+ * system notification shade is untouched by any of this.
  * <p>
- * Content is entirely sourced from lists that already exist elsewhere
- * rather than a new favorites mechanism: "Favoritos" is GlanceQuickApps'
- * curated list, "Recientes" is RecentApps' launch history.
+ * Two tabs, swiped between manually (CenterTabLayout + a plain View-backed
+ * PagerAdapter - see DashboardPagerAdapter):
+ * <ul>
+ *     <li>Inicio: a DND toggle, "Favoritos" (GlanceQuickApps' curated
+ *     list) and "Recientes" (RecentApps' launch history) - all sourced
+ *     from lists that already exist elsewhere.</li>
+ *     <li>Multimedia: a Now Playing card driven by the same
+ *     MediaSessionManager/NotificationService approach the Glance Media
+ *     chip already uses, plus a small user-curated row of media app
+ *     shortcuts (DashboardMediaApps) - editable directly here, since
+ *     unlike Favoritos there's nowhere else for it to be edited.</li>
+ * </ul>
  */
 public class DashboardDialog extends SheetDialogFragment {
     private SharedPreferences quickAppsPreferences;
     private SharedPreferences recentAppsPreferences;
+    private SharedPreferences mediaAppsPreferences;
     private DashboardAppAdapter favoritesAdapter;
     private DashboardAppAdapter recentAdapter;
+    private DashboardAppAdapter mediaAppsAdapter;
     private MediaSessionManager mediaSessionManager;
     private MediaController nowPlayingSession;
     private ThemedActivity activity;
@@ -90,7 +102,6 @@ public class DashboardDialog extends SheetDialogFragment {
     private ImageView nowPlayingPlayPause;
     private TextView nowPlayingTitle;
     private TextView nowPlayingArtist;
-    private Battery battery;
     private Focus focus;
     private View root;
 
@@ -120,6 +131,8 @@ public class DashboardDialog extends SheetDialogFragment {
                 .getSharedPreferences(Entry.GLANCE_QUICK_APPS);
         this.recentAppsPreferences = activity.getApplicationContext()
                 .getSharedPreferences(Entry.RECENT_APPS);
+        this.mediaAppsPreferences = activity.getApplicationContext()
+                .getSharedPreferences(Entry.DASHBOARD_MEDIA_APPS);
         this.mediaSessionManager = (MediaSessionManager)
                 activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
     }
@@ -131,33 +144,97 @@ public class DashboardDialog extends SheetDialogFragment {
         root = inflater.inflate(R.layout.widget_dashboard, container, false);
 
         FadingEdgeLayout fader = root.findViewById(R.id.fader);
-        ViewGroup content = root.findViewById(R.id.content);
-        placeholder = root.findViewById(R.id.placeholder);
-        favoritesSection = root.findViewById(R.id.favorites_section);
-        recentSection = root.findViewById(R.id.recent_section);
+        LinearLayout content = root.findViewById(R.id.content);
+        CenterTabLayout tabs = root.findViewById(R.id.tabs);
+        CustomDurationViewPager pager = root.findViewById(R.id.pager);
 
-        // Reuses the same Glance chips rather than inventing a second status
-        // display - a quick DND toggle and battery read, right where the
-        // user is already looking for "what's going on right now".
-        LinearLayout statusRow = root.findViewById(R.id.status_row);
+        View pageHome = inflater.inflate(R.layout.dashboard_page_home, pager, false);
+        View pageMedia = inflater.inflate(R.layout.dashboard_page_media, pager, false);
 
-        battery = new Battery();
-        View batteryView = battery.inflate(activity, statusRow);
-        batteryView.setOnClickListener(battery.getClickListener());
-        statusRow.addView(batteryView);
+        setupHomePage(pageHome);
+        setupMediaPage(pageMedia);
+
+        List<View> pages = new ArrayList<>();
+        pages.add(pageHome);
+        pages.add(pageMedia);
+
+        List<CharSequence> titles = new ArrayList<>();
+        titles.add(activity.getResources().getString(R.string.dashboard_home));
+        titles.add(activity.getResources().getString(R.string.dashboard_media));
+
+        pager.setAdapter(new DashboardPagerAdapter(pages, titles));
+        tabs.setViewPager(pager);
+
+        Measurements.addStatusBarListener(value -> {
+            fader.setFadeSizes(value, 0, Measurements.getNavHeight(), 0);
+
+            content.setPadding(content.getPaddingLeft(), value,
+                    content.getPaddingRight(), content.getPaddingBottom());
+        });
+        Measurements.addNavListener(value -> {
+            fader.setFadeSizes(Measurements.getSysUIHeight(), 0, value, 0);
+
+            pager.setPadding(pager.getPaddingLeft(), pager.getPaddingTop(),
+                    pager.getPaddingRight(), value);
+        });
+
+        setOnBackPressed(() -> {
+            hide(true);
+
+            return true;
+        });
+
+        return root;
+    }
+
+    private void setupHomePage(View page) {
+        placeholder = page.findViewById(R.id.placeholder);
+        favoritesSection = page.findViewById(R.id.favorites_section);
+        recentSection = page.findViewById(R.id.recent_section);
+
+        // Reuses the same Glance chip rather than inventing a second status
+        // display - a quick DND toggle right where the user is already
+        // looking for "what's going on right now".
+        LinearLayout statusRow = page.findViewById(R.id.status_row);
 
         focus = new Focus();
         View focusView = focus.inflate(activity, statusRow);
         focusView.setOnClickListener(focus.getClickListener());
         statusRow.addView(focusView);
 
-        nowPlayingCard = root.findViewById(R.id.now_playing_card);
-        nowPlayingCover = root.findViewById(R.id.now_playing_cover);
-        nowPlayingTitle = root.findViewById(R.id.now_playing_title);
-        nowPlayingArtist = root.findViewById(R.id.now_playing_artist);
-        nowPlayingPlayPause = root.findViewById(R.id.now_playing_play_pause);
-        ImageView nowPlayingPrevious = root.findViewById(R.id.now_playing_previous);
-        ImageView nowPlayingNext = root.findViewById(R.id.now_playing_next);
+        RecyclerView recyclerFavorites = page.findViewById(R.id.recycler_favorites);
+        RecyclerView recyclerRecent = page.findViewById(R.id.recycler_recent);
+
+        recyclerFavorites.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.HORIZONTAL, false));
+        recyclerRecent.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.HORIZONTAL, false));
+
+        DashboardAppAdapter.Listener launchListener = packageName -> {
+            LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
+
+            if (application != null) {
+                application.launch(activity);
+            }
+
+            hide(true);
+        };
+
+        favoritesAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
+        recentAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
+
+        recyclerFavorites.setAdapter(favoritesAdapter);
+        recyclerRecent.setAdapter(recentAdapter);
+    }
+
+    private void setupMediaPage(View page) {
+        nowPlayingCard = page.findViewById(R.id.now_playing_card);
+        nowPlayingCover = page.findViewById(R.id.now_playing_cover);
+        nowPlayingTitle = page.findViewById(R.id.now_playing_title);
+        nowPlayingArtist = page.findViewById(R.id.now_playing_artist);
+        nowPlayingPlayPause = page.findViewById(R.id.now_playing_play_pause);
+        ImageView nowPlayingPrevious = page.findViewById(R.id.now_playing_previous);
+        ImageView nowPlayingNext = page.findViewById(R.id.now_playing_next);
 
         nowPlayingPlayPause.setOnClickListener(v -> {
             if (nowPlayingSession == null) {
@@ -191,50 +268,44 @@ public class DashboardDialog extends SheetDialogFragment {
             }
         });
 
-        RecyclerView recyclerFavorites = root.findViewById(R.id.recycler_favorites);
-        RecyclerView recyclerRecent = root.findViewById(R.id.recycler_recent);
-
-        recyclerFavorites.setLayoutManager(new LinearLayoutManager(activity,
-                LinearLayoutManager.HORIZONTAL, false));
-        recyclerRecent.setLayoutManager(new LinearLayoutManager(activity,
+        RecyclerView recyclerMediaApps = page.findViewById(R.id.recycler_media_apps);
+        recyclerMediaApps.setLayoutManager(new LinearLayoutManager(activity,
                 LinearLayoutManager.HORIZONTAL, false));
 
-        DashboardAppAdapter.Listener launchListener = packageName -> {
-            LauncherApplication application = ProfileManager.getInstance().getApplication(packageName);
+        mediaAppsAdapter = new DashboardAppAdapter(activity, new ArrayList<>(),
+                new DashboardAppAdapter.Listener() {
+                    @Override
+                    public void onAppClick(String packageName) {
+                        LauncherApplication application =
+                                ProfileManager.getInstance().getApplication(packageName);
 
-            if (application != null) {
-                application.launch(activity);
-            }
+                        if (application != null) {
+                            application.launch(activity);
+                        }
 
-            hide(true);
-        };
+                        hide(true);
+                    }
 
-        favoritesAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
-        recentAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
+                    @Override
+                    public void onAppLongClick(String packageName) {
+                        DashboardMediaApps.remove(mediaAppsPreferences, packageName);
 
-        recyclerFavorites.setAdapter(favoritesAdapter);
-        recyclerRecent.setAdapter(recentAdapter);
+                        refreshMediaApps();
+                    }
 
-        Measurements.addStatusBarListener(value -> {
-            fader.setFadeSizes(value, 0, Measurements.getNavHeight(), 0);
+                    @Override
+                    public void onAddClick() {
+                        new GestureAppPickerDialog(activity, packageName -> {
+                            if (packageName != null) {
+                                DashboardMediaApps.add(mediaAppsPreferences, packageName);
 
-            content.setPadding(content.getPaddingLeft(), value,
-                    content.getPaddingRight(), content.getPaddingBottom());
-        });
-        Measurements.addNavListener(value -> {
-            fader.setFadeSizes(Measurements.getSysUIHeight(), 0, value, 0);
+                                refreshMediaApps();
+                            }
+                        }).show();
+                    }
+                }, true);
 
-            content.setPadding(content.getPaddingLeft(), content.getPaddingTop(),
-                    content.getPaddingRight(), value);
-        });
-
-        setOnBackPressed(() -> {
-            hide(true);
-
-            return true;
-        });
-
-        return root;
+        recyclerMediaApps.setAdapter(mediaAppsAdapter);
     }
 
     @Override
@@ -245,21 +316,21 @@ public class DashboardDialog extends SheetDialogFragment {
     }
 
     /**
-     * Both source lists can change while this sheet is closed (favorites
+     * Every source list can change while this sheet is closed (favorites
      * through the Glance long-press popup, recents through simply using
-     * the launcher), so pull a fresh snapshot every time the sheet comes
-     * back on screen rather than only once in onCreateView().
+     * the launcher, playback through whatever media app is running), so
+     * pull a fresh snapshot every time the sheet comes back on screen
+     * rather than only once in onCreateView(). Both pages are already
+     * inflated (see DashboardPagerAdapter), so this refreshes both
+     * regardless of which tab happens to be showing.
      */
     private void refresh() {
-        if (battery != null) {
-            battery.update();
-        }
-
         if (focus != null) {
             focus.update();
         }
 
         updateNowPlaying();
+        refreshMediaApps();
 
         if (favoritesAdapter == null || recentAdapter == null) {
             return;
@@ -278,11 +349,19 @@ public class DashboardDialog extends SheetDialogFragment {
                 View.VISIBLE : View.GONE);
     }
 
+    private void refreshMediaApps() {
+        if (mediaAppsAdapter == null) {
+            return;
+        }
+
+        mediaAppsAdapter.setPackages(filterInstalled(DashboardMediaApps.getPackages(mediaAppsPreferences)));
+    }
+
     /**
-     * A compact playback card - the same MediaSessionManager/NotificationService
-     * approach the Glance Media chip already uses (and the same "Do Not Disturb
-     * access"-style separate permission: notification listener access), just
-     * without that chip's popup/transition machinery, since this only needs to
+     * The same MediaSessionManager/NotificationService approach the Glance
+     * Media chip already uses (and the same "Do Not Disturb access"-style
+     * separate permission: notification listener access), just without
+     * that chip's popup/transition machinery, since this only needs to
      * show current state and forward transport commands.
      */
     private void updateNowPlaying() {

@@ -29,196 +29,50 @@
         android:clipToPadding="false"
         app:edge="top|bottom">
 
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/scroller"
+        <LinearLayout
+            android:id="@+id/content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:fillViewport="true"
-            android:overScrollMode="never">
+            android:orientation="vertical">
 
-            <LinearLayout
-                android:id="@+id/content"
+            <com.stario.launcher.ui.common.tabs.CenterTabLayout
+                android:id="@+id/tabs"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipChildren="false"
+                android:layout_height="44sp"
                 android:clipToPadding="false"
-                android:orientation="vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp">
+                app:stl_clickable="false"
+                app:stl_defaultTabBackground="@android:color/transparent"
+                app:stl_defaultTabTextAllCaps="false"
+                app:stl_defaultTabTextHorizontalPadding="14dp"
+                app:stl_defaultTabTextMinWidth="20dp"
+                app:stl_defaultTabTextSize="17sp"
+                app:stl_distributeEvenly="true"
+                app:stl_dividerThickness="0dp"
+                app:stl_drawDecorationAfterTab="false"
+                app:stl_indicatorAlwaysInCenter="true"
+                app:stl_indicatorColor="?attr/colorPrimaryContainer"
+                app:stl_indicatorCornerRadius="24dp"
+                app:stl_indicatorGravity="center"
+                app:stl_indicatorInFront="false"
+                app:stl_indicatorInterpolation="linear"
+                app:stl_indicatorThickness="44sp"
+                app:stl_indicatorWidth="auto"
+                app:stl_indicatorWithoutPadding="false"
+                app:stl_overlineThickness="0dp"
+                app:stl_titleOffset="0dp"
+                app:stl_underlineThickness="0dp" />
 
-                <LinearLayout
-                    android:id="@+id/status_row"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:background="@drawable/background_medium_corners"
-                    android:clipToOutline="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal" />
+            <com.stario.launcher.ui.common.pager.CustomDurationViewPager
+                android:id="@+id/pager"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:overScrollMode="never" />
 
-                <LinearLayout
-                    android:id="@+id/now_playing_card"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="15dp"
-                    android:background="@drawable/background_medium_corners"
-                    android:clipToOutline="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="8dp"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/now_playing_cover"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:background="@drawable/background_small_corners"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop" />
-
-                    <LinearLayout
-                        android:layout_width="0px"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/now_playing_title"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:fontFamily="@font/dm_sans_medium"
-                            android:letterSpacing="-0.02"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:id="@+id/now_playing_artist"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:fontFamily="@font/dm_sans_regular"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:alpha="0.7"
-                            android:textSize="13sp" />
-
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/now_playing_previous"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="@drawable/ripple"
-                        android:padding="7dp"
-                        android:src="@drawable/ic_media_previous" />
-
-                    <ImageView
-                        android:id="@+id/now_playing_play_pause"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="2dp"
-                        android:layout_marginEnd="2dp"
-                        android:background="@drawable/ripple"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_media_play" />
-
-                    <ImageView
-                        android:id="@+id/now_playing_next"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="@drawable/ripple"
-                        android:padding="7dp"
-                        android:src="@drawable/ic_media_next" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/placeholder"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="40dp"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_margin="5dp"
-                        android:fontFamily="@font/dm_sans_regular"
-                        android:text="@string/dashboard_empty"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="20sp" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/favorites_section"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="15dp"
-                    android:orientation="vertical"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="5dp"
-                        android:fontFamily="@font/dm_sans_medium"
-                        android:letterSpacing="-0.03"
-                        android:text="@string/dashboard_favorites"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="18sp" />
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/recycler_favorites"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:clipChildren="false"
-                        android:clipToPadding="false"
-                        android:orientation="horizontal"
-                        android:overScrollMode="never" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/recent_section"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="15dp"
-                    android:orientation="vertical"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="5dp"
-                        android:fontFamily="@font/dm_sans_medium"
-                        android:letterSpacing="-0.03"
-                        android:text="@string/dashboard_recent"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="18sp" />
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/recycler_recent"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:clipChildren="false"
-                        android:clipToPadding="false"
-                        android:orientation="horizontal"
-                        android:overScrollMode="never" />
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </androidx.core.widget.NestedScrollView>
+        </LinearLayout>
 
     </com.stario.launcher.ui.common.FadingEdgeLayout>
 
