@@ -182,6 +182,9 @@
     <string name="rename">Rename</string>
     <string name="headlines_loading">Briefing</string>
     <string name="battery_percentage">%1$d%%</string>
+    <string name="dashboard_favorites">Favoritos</string>
+    <string name="dashboard_recent">Recientes</string>
+    <string name="dashboard_empty">Nothing to show yet. Add favorites from Glance or open a few apps.</string>
     <string name="focus_access_title">Focus access</string>
     <string name="focus_access_description">To toggle Do Not Disturb from here, Stario needs Do Not Disturb access. You can revoke it anytime from system settings.</string>
     <string name="widget_schedule">Schedule</string>

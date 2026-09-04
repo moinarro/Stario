@@ -58,6 +58,7 @@ import com.stario.launcher.gestures.Gestures;
 import com.stario.launcher.gestures.TwoFingerSwipeGestureDetector;
 import com.stario.launcher.preferences.Entry;
 import com.stario.launcher.preferences.Vibrations;
+import com.stario.launcher.sheet.SheetType;
 import com.stario.launcher.sheet.SheetsFocusController;
 import com.stario.launcher.themes.ThemedActivity;
 import com.stario.launcher.ui.Measurements;
@@ -240,7 +241,15 @@ public class Launcher extends ThemedActivity {
 
             @Override
             public void onSwipe(TwoFingerSwipeGestureDetector.Direction direction) {
-                gestures.trigger(Launcher.this, direction);
+                boolean handled = gestures.trigger(Launcher.this, direction);
+
+                // A two-finger swipe down with nothing assigned opens the
+                // Dashboard mini-sheet instead of being a no-op - deliberately
+                // NOT the one-finger swipe down that reveals the system
+                // notification shade, which is untouched by any of this.
+                if (!handled && direction == TwoFingerSwipeGestureDetector.Direction.DOWN) {
+                    controller.showSheet(SheetType.TOP_SHEET);
+                }
             }
 
             @Override
