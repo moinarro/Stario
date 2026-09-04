@@ -83,6 +83,16 @@ public class WidgetStackView extends FrameLayout {
     public WidgetStackView(Context context, List<Integer> children, Callback callback) {
         super(context);
 
+        // ViewGroup.addViewInner() only calls child.resetRtlProperties() -
+        // whose ViewGroup override crashes with a NullPointerException on
+        // this Android build, see WidgetContainer's addViewInLayout() call -
+        // when the child's own isLayoutDirectionInherited() is true, which
+        // it is by default (LAYOUT_DIRECTION_INHERIT). Explicitly resolving
+        // this view's own direction up front means that guard is false, so
+        // that whole call is skipped for this view entirely, regardless of
+        // what's actually null inside it.
+        setLayoutDirection(LAYOUT_DIRECTION_LOCALE);
+
         this.children = children;
         this.callback = callback;
 
