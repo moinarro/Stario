@@ -21,6 +21,7 @@ import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.GridLayout;
 import android.widget.RelativeLayout;
 
@@ -50,19 +51,32 @@ public class WidgetContainer extends RelativeLayout implements Comparable<Widget
         setPadding(padding, padding, padding, padding);
         setRotation(180);
 
-        // A WidgetStackView (unlike a plain AppWidgetHostView) has no
-        // single widget size to report, so it would otherwise shrink to
-        // RelativeLayout's WRAP_CONTENT default. That's handled by
-        // WidgetStackView.onMeasure() always claiming the full space it's
-        // offered, rather than by giving it explicit MATCH_PARENT
-        // LayoutParams here: calling setLayoutParams() with a *newly
-        // constructed* LayoutParams object - however that call is reached,
-        // and regardless of whether this container is attached to a window
-        // yet - crashes with a NullPointerException in
-        // ViewGroup.resolveLayoutParams() on some newer Android versions.
-        // Plain addView(host), exactly like a normal widget uses, never
-        // triggers it.
-        addView(host);
+        // Any addView(host) overload - regardless of explicit params, of
+        // whether this container has been attached yet, or of whether host
+        // itself has any children yet - ends up calling host.setLayoutParams(),
+        // which crashes with a NullPointerException in
+        // ViewGroup.resolveLayoutParams() specifically when host is a
+        // WidgetStackView, on some newer Android versions. A plain
+        // AppWidgetHostView never hits it.
+        //
+        // addViewInLayout(..., preventRequestLayout=true) is the framework's
+        // own escape hatch for adding a child without going through
+        // setLayoutParams() at all - it assigns the LayoutParams field
+        // directly instead (the same mechanism RecyclerView/ViewPager use
+        // internally to add views outside the normal flow), sidestepping
+        // the crash entirely. It skips the requestLayout()/invalidate()
+        // that addView() normally triggers, so those are called explicitly
+        // afterward.
+        ViewGroup.LayoutParams params = host.getLayoutParams();
+
+        if (params == null) {
+            params = generateDefaultLayoutParams();
+        }
+
+        addViewInLayout(host, -1, params, true);
+
+        requestLayout();
+        invalidate();
     }
 
     @Override
