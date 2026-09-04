@@ -292,6 +292,16 @@ public class GlanceQuickApps {
         recycler.setAdapter(adapter);
         updateEmptyState(empty);
 
+        // Kept invisible until the layout below has actually settled at its
+        // target scroll position (see the post() a few lines down) - masks
+        // the brief window, right after attaching the adapter and jumping
+        // to that position, where RecyclerView/GridLayoutManager is still
+        // reconciling intermediate view states and would otherwise be
+        // visible mid-shuffle for a frame or two, reading as a flicker.
+        if (infinite) {
+            recycler.setVisibility(View.INVISIBLE);
+        }
+
         if (infinite) {
             // Wraps around indefinitely (the adapter reports Integer.MAX_VALUE
             // items and maps position -> real index via modulo), so start
@@ -314,6 +324,8 @@ public class GlanceQuickApps {
             int startPosition = (int) Math.min(block * 4, Integer.MAX_VALUE);
 
             manager.scrollToPosition(startPosition);
+
+            recycler.post(() -> recycler.setVisibility(View.VISIBLE));
 
             if (scrollMode == ScrollMode.CONTINUOUS) {
                 attachAutoScroll(recycler);
