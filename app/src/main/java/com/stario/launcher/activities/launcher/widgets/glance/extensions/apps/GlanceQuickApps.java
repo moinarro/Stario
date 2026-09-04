@@ -299,23 +299,19 @@ public class GlanceQuickApps {
             // the real list, to allow scrolling freely in either direction
             // without ever hitting an edge.
             //
-            // Deliberately NOT anywhere near Integer.MAX_VALUE/2, despite the
-            // adapter itself reporting that many items: GridLayoutManager's
-            // internal offset/anchor math multiplies the position by an
-            // estimated item size while laying out, and with a multi-row
-            // (rows > 1) grid and a starting index in the hundreds of
-            // millions that calculation silently overflows int range,
-            // producing corrupted offsets - seen as the icons flickering/
-            // jumping right after the popup opens, until a touch forces
-            // RecyclerView onto its relative (delta-based, overflow-free)
-            // scroll path instead. A few hundred loops of the real list is
-            // still far more than anyone will ever scroll through, while
-            // keeping the starting index small enough that the offset math
-            // stays well inside int range.
+            // Deliberately NOT a huge jump, despite the adapter itself
+            // reporting Integer.MAX_VALUE items: scrollToPosition() to a far
+            // starting index makes RecyclerView/GridLayoutManager measure and
+            // bind through a chain of intermediate view states while it
+            // settles into that position (worse with a multi-row grid, since
+            // there's more to lay out per pass), which is visible as the
+            // real icons flashing past in rapid succession right after the
+            // popup opens - reading as flicker even though nothing is
+            // actually broken. A handful of loops of the real list is
+            // already far more headroom than a user swiping a small popup
+            // will ever reach in either direction, so keep the jump tiny.
             long block = (long) rows * packages.size();
-            long startPositionLong = block * 200;
-            int startPosition = startPositionLong <= Integer.MAX_VALUE ?
-                    (int) startPositionLong : (int) block;
+            int startPosition = (int) Math.min(block * 4, Integer.MAX_VALUE);
 
             manager.scrollToPosition(startPosition);
 
