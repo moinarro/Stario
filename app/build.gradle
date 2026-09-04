@@ -77,7 +77,10 @@ android {
                            'src/main/res/media',
                            'src/main/res/weather',
                            'src/main/res/glance',
-                           'src/main/res/calendar']
+                           'src/main/res/calendar',
+                           'src/main/res/battery',
+                           'src/main/res/focus',
+                           'src/main/res/dashboard']
             }
         }
     }
