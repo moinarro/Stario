@@ -760,6 +760,13 @@ public class SheetsFocusController extends ConstraintLayout {
         public void show() {
             if (showRunnable != null) {
                 showRunnable.run();
+            } else {
+                // Already added to the FragmentManager from a previous show() -
+                // DialogFragment.show() only works once per fragment instance,
+                // so reopening it after that first time (e.g. a second
+                // two-finger swipe down, or tapping the Headlines chip again)
+                // has to go through the sheet's own re-expand instead.
+                dialogFragment.expand();
             }
         }
     }
