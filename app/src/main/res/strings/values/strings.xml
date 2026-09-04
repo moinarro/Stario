@@ -181,6 +181,15 @@
     <string name="widget_stack_name">Stack name</string>
     <string name="rename">Rename</string>
     <string name="headlines_loading">Briefing</string>
+    <string name="widget_schedule">Schedule</string>
+    <string name="widget_schedule_always_visible">Always visible</string>
+    <string name="widget_schedule_unnamed">Unnamed profile</string>
+    <string name="widget_schedule_title">Widget schedule</string>
+    <string name="widget_schedule_description">Assign widgets to a time-of-day profile from their own menu (long-press a widget, or a stack\'s header) - only widgets assigned to a profile ever get hidden, and only outside their own time range.</string>
+    <string name="widget_schedule_empty">No profiles yet. Widgets stay visible until you add one.</string>
+    <string name="widget_schedule_add">Add profile</string>
+    <string name="widget_schedule_enabled">Enabled</string>
+    <string name="widget_schedule_profile_name">Profile name</string>
     <string name="widget_stack_page_count">%1$d / %2$d</string>
     <string name="remove_from_stack">Remove from stack</string>
     <string name="move_up">Move up</string>

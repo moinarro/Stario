@@ -49,6 +49,7 @@ import com.stario.launcher.sheet.SheetDialogFragment;
 import com.stario.launcher.sheet.SheetType;
 import com.stario.launcher.sheet.widgets.Widget;
 import com.stario.launcher.sheet.widgets.WidgetSize;
+import com.stario.launcher.sheet.widgets.WidgetSchedule;
 import com.stario.launcher.sheet.widgets.WidgetStack;
 import com.stario.launcher.sheet.widgets.configurator.WidgetConfigurator;
 import com.stario.launcher.sheet.widgets.dialog.RenameStackDialog;
@@ -86,6 +87,7 @@ public class WidgetsDialog extends SheetDialogFragment {
     private boolean isStackConfiguratorVisible;
     private SharedPreferences widgetStore;
     private SharedPreferences widgetStackStore;
+    private SharedPreferences widgetSchedulePreferences;
     private WidgetSize pendingWidgetSize;
     // Target of an in-flight "add a widget to this stack" flow. Only one such
     // flow can be in progress at a time (the picker is modal), so plain
@@ -128,6 +130,8 @@ public class WidgetsDialog extends SheetDialogFragment {
                 .getSharedPreferences(Entry.WIDGETS);
         this.widgetStackStore = activity.getApplicationContext()
                 .getSharedPreferences(Entry.WIDGET_STACKS);
+        this.widgetSchedulePreferences = activity.getApplicationContext()
+                .getSharedPreferences(Entry.WIDGET_SCHEDULE);
 
         bindWidgetRequest = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -270,11 +274,24 @@ public class WidgetsDialog extends SheetDialogFragment {
             }
         }
 
+        // A widget tagged with a WidgetSchedule slot only gets attached to
+        // the grid while that slot is the currently active one - re-evaluated
+        // every time this sheet is opened, same "check on open" cadence as
+        // PinnedCategorySchedule. Its storage/allocation is untouched either
+        // way, so it reappears on its own once its slot becomes active again;
+        // this is purely about which views end up in the grid this time.
+        String activeScheduleSlotId = WidgetSchedule.resolveActiveSlotId(widgetSchedulePreferences);
+
         while (!widgets.isEmpty()) {
             AppWidgetManager manager = AppWidgetManager.getInstance(activity);
             Widget widget = widgets.poll();
 
             if (widget != null) {
+                if (widget.scheduleSlotId != null &&
+                        !widget.scheduleSlotId.equals(activeScheduleSlotId)) {
+                    continue;
+                }
+
                 View host = widget.isStack ? createStackView(widget) : createWidgetView(manager, widget);
 
                 grid.attach(host, widget);
@@ -578,6 +595,59 @@ public class WidgetsDialog extends SheetDialogFragment {
         }
     }
 
+    /**
+     * Opens a picker of every configured WidgetSchedule profile (plus
+     * "Always visible") for this widget/stack, sets its scheduleSlotId, and
+     * - since a widget assigned to a slot that isn't the active one should
+     * disappear immediately rather than waiting for the sheet to reopen -
+     * runs onHidden if the newly assigned slot isn't currently active.
+     */
+    private void assignWidgetSchedule(Widget widget, View anchor, Runnable onHidden) {
+        Vibrations.getInstance().vibrate();
+
+        List<WidgetSchedule.TimeSlot> slots = WidgetSchedule.sorted(
+                WidgetSchedule.loadSlots(widgetSchedulePreferences));
+        Resources resources = getResources();
+
+        PopupMenu menu = new PopupMenu(activity);
+
+        String alwaysVisibleLabel = resources.getString(R.string.widget_schedule_always_visible) +
+                (widget.scheduleSlotId == null ? " ✓" : "");
+
+        menu.add(new PopupMenu.Item(alwaysVisibleLabel, null,
+                v -> setWidgetScheduleSlot(widget, null, onHidden)));
+
+        for (WidgetSchedule.TimeSlot slot : slots) {
+            String name = slot.name != null && !slot.name.isEmpty() ?
+                    slot.name : resources.getString(R.string.widget_schedule_unnamed);
+
+            if (slot.id.equals(widget.scheduleSlotId)) {
+                name += " ✓";
+            }
+
+            menu.add(new PopupMenu.Item(name, null,
+                    v -> setWidgetScheduleSlot(widget, slot.id, onHidden)));
+        }
+
+        menu.show(activity, anchor, PopupMenu.PIVOT_CENTER_HORIZONTAL, true);
+    }
+
+    private void setWidgetScheduleSlot(Widget widget, @Nullable String slotId, Runnable onHidden) {
+        widget.scheduleSlotId = slotId;
+
+        widgetStore.edit()
+                .putString(String.valueOf(widget.id), widget.serialize())
+                .apply();
+
+        String activeSlotId = WidgetSchedule.resolveActiveSlotId(widgetSchedulePreferences);
+
+        if (slotId != null && !slotId.equals(activeSlotId) && onHidden != null) {
+            onHidden.run();
+
+            updatePlaceholderVisibility(grid.getChildCount() == 0 ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void renameStack(WidgetStackView view, Widget widget) {
         WidgetStack stack = loadStack(widget.id);
 
@@ -603,6 +673,12 @@ public class WidgetsDialog extends SheetDialogFragment {
         menu.add(new PopupMenu.Item(resources.getString(R.string.rename),
                 AppCompatResources.getDrawable(activity, R.drawable.ic_edit),
                 v -> renameStack(view, widget))
+        );
+
+        menu.add(new PopupMenu.Item(resources.getString(R.string.widget_schedule),
+                AppCompatResources.getDrawable(activity, R.drawable.ic_schedule),
+                v -> assignWidgetSchedule(widget, view,
+                        () -> grid.removeView((View) (view.getParent()))))
         );
 
         menu.add(new PopupMenu.Item(resources.getString(R.string.create_a_widget),
@@ -722,6 +798,11 @@ public class WidgetsDialog extends SheetDialogFragment {
                         })
                 );
             }
+
+            menu.add(new PopupMenu.Item(resources.getString(R.string.widget_schedule),
+                    AppCompatResources.getDrawable(activity, R.drawable.ic_schedule),
+                    view -> assignWidgetSchedule(widget, host,
+                            () -> grid.removeView((View) (host.getParent())))));
 
             if (widget.size == WidgetSize.SMALL) {
                 menu.add(new PopupMenu.Item(resources.getString(R.string.move_left),

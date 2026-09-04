@@ -45,6 +45,7 @@ import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.M
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
 import com.stario.launcher.activities.launcher.widgets.pins.PinnedCategory;
 import com.stario.launcher.activities.settings.dialogs.apps.QuickAppsDialog;
+import com.stario.launcher.activities.settings.dialogs.widgets.WidgetScheduleDialog;
 import com.stario.launcher.activities.settings.dialogs.gestures.GesturesDialog;
 import com.stario.launcher.activities.settings.dialogs.location.LocationDialog;
 import com.stario.launcher.activities.settings.dialogs.pin.PinnedCategoryDialog;
@@ -207,6 +208,26 @@ public class HomeScreenDialog extends ActionDialog {
             public void onClick(View view) {
                 if (dialog == null) {
                     dialog = new QuickAppsDialog(activity);
+                    dialog.setOnDismissListener(d -> showing = false);
+                }
+
+                if (!showing) {
+                    dialog.show();
+                    showing = true;
+                }
+            }
+        });
+
+        // Widget schedule (time-of-day profiles a widget/stack can be
+        // assigned to from its own menu - see WidgetsDialog)
+        root.findViewById(R.id.widget_schedule_container).setOnClickListener(new View.OnClickListener() {
+            private WidgetScheduleDialog dialog;
+            private boolean showing = false;
+
+            @Override
+            public void onClick(View view) {
+                if (dialog == null) {
+                    dialog = new WidgetScheduleDialog(activity);
                     dialog.setOnDismissListener(d -> showing = false);
                 }
 

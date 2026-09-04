@@ -24,6 +24,8 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import android.widget.TextView;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.stario.launcher.R;
@@ -41,13 +43,28 @@ import com.stario.launcher.ui.keyboard.extract.ExtractEditText;
 public class RenameStackDialog extends ActionDialog {
     private final String initialName;
     private final Listener listener;
+    @StringRes
+    private final int titleRes;
+    @StringRes
+    private final int hintRes;
 
     private ExtractEditText editText;
 
     public RenameStackDialog(@NonNull ThemedActivity activity,
                              @Nullable String initialName, @NonNull Listener listener) {
+        this(activity, R.string.widget_stack_name, R.string.widget_stack, initialName, listener);
+    }
+
+    /**
+     * @param titleRes shown as the sheet's heading
+     * @param hintRes shown as the input's placeholder while empty
+     */
+    public RenameStackDialog(@NonNull ThemedActivity activity, @StringRes int titleRes, @StringRes int hintRes,
+                             @Nullable String initialName, @NonNull Listener listener) {
         super(activity);
 
+        this.titleRes = titleRes;
+        this.hintRes = hintRes;
         this.initialName = initialName;
         this.listener = listener;
 
@@ -64,7 +81,11 @@ public class RenameStackDialog extends ActionDialog {
     protected View inflateContent(LayoutInflater inflater) {
         View root = inflater.inflate(R.layout.pop_up_widget_stack_name, null);
 
+        TextView title = root.findViewById(R.id.title);
+        title.setText(titleRes);
+
         editText = root.findViewById(R.id.name);
+        editText.setHint(hintRes);
         editText.setText(initialName);
 
         if (initialName != null) {

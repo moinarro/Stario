@@ -40,6 +40,14 @@ public class Widget implements Comparable<Widget> {
     @SerializedName("stack")
     public boolean isStack;
 
+    // Optional WidgetSchedule.TimeSlot id this widget belongs to. Null
+    // (the default for every previously-serialized widget) means "always
+    // visible" - only a widget explicitly assigned to a slot is ever
+    // hidden while that slot isn't the active one.
+    @SerializedName("scheduleSlot")
+    @Nullable
+    public String scheduleSlotId;
+
     public Widget(int id, int position, WidgetSize size) {
         this.id = id;
         this.position = position;
