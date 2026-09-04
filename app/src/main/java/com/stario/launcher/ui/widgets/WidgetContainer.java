@@ -50,7 +50,20 @@ public class WidgetContainer extends RelativeLayout implements Comparable<Widget
         setPadding(padding, padding, padding, padding);
         setRotation(180);
 
-        addView(host);
+        if (host instanceof WidgetStackView) {
+            // A WidgetStackView has no single AppWidgetHostView size to
+            // report, so - unlike a plain widget - nothing else forces it
+            // to fill this container; without explicit MATCH_PARENT params
+            // it would shrink to RelativeLayout's WRAP_CONTENT default.
+            // Handed to addView() here (rather than set on the still-
+            // unparented view by WidgetStackView itself) since
+            // View.setLayoutParams() on a view with no parent yet crashes
+            // on some newer Android versions.
+            addView(host, new RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+        } else {
+            addView(host);
+        }
     }
 
     @Override

@@ -83,13 +83,11 @@ public class WidgetStackView extends FrameLayout {
 
         // WidgetContainer (this view's eventual parent) is a RelativeLayout,
         // so its onMeasure() casts the child's LayoutParams to
-        // RelativeLayout.LayoutParams - match that up front the same way
-        // WidgetHost.onCreateView() does for a plain AppWidgetHostView,
-        // rather than leaving RelativeLayout to generate a WRAP_CONTENT
-        // default that would shrink this view to nothing.
-        setLayoutParams(new RelativeLayout.LayoutParams(
-                RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
-
+        // RelativeLayout.LayoutParams. That LayoutParams object is handed
+        // to WidgetContainer.addView() instead of being set here directly:
+        // calling View.setLayoutParams() on a view that has no parent yet
+        // crashes with a NullPointerException in ViewGroup.resolveLayoutParams()
+        // -- see WidgetContainer's addView(host, ...) call.
         View root = LayoutInflater.from(context)
                 .inflate(R.layout.widget_stack_container, this, true);
 
