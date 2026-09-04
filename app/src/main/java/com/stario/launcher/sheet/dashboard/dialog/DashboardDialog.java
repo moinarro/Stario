@@ -46,6 +46,7 @@ import com.stario.launcher.BuildConfig;
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.focus.Focus;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.RecentMedia;
 import com.stario.launcher.activities.settings.dialogs.gestures.GestureAppPickerDialog;
 import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
@@ -79,18 +80,23 @@ import java.util.List;
  *     from lists that already exist elsewhere.</li>
  *     <li>Multimedia: a Now Playing card driven by the same
  *     MediaSessionManager/NotificationService approach the Glance Media
- *     chip already uses, plus a small user-curated row of media app
- *     shortcuts (DashboardMediaApps) - editable directly here, since
- *     unlike Favoritos there's nowhere else for it to be edited.</li>
+ *     chip already uses, an "Escuchado recientemente" listening history
+ *     (RecentMedia, fed from Media's own live session tracking) - the
+ *     actual dashboard summary this tab was missing - plus a small
+ *     user-curated row of media app shortcuts (DashboardMediaApps) -
+ *     editable directly here, since unlike Favoritos there's nowhere
+ *     else for it to be edited.</li>
  * </ul>
  */
 public class DashboardDialog extends SheetDialogFragment {
     private SharedPreferences quickAppsPreferences;
     private SharedPreferences recentAppsPreferences;
     private SharedPreferences mediaAppsPreferences;
+    private SharedPreferences recentMediaPreferences;
     private DashboardAppAdapter favoritesAdapter;
     private DashboardAppAdapter recentAdapter;
     private DashboardAppAdapter mediaAppsAdapter;
+    private RecentMediaAdapter mediaHistoryAdapter;
     private MediaSessionManager mediaSessionManager;
     private MediaController nowPlayingSession;
     private ThemedActivity activity;
@@ -98,6 +104,7 @@ public class DashboardDialog extends SheetDialogFragment {
     private View favoritesSection;
     private View recentSection;
     private View nowPlayingCard;
+    private View historySection;
     private ImageView nowPlayingCover;
     private ImageView nowPlayingPlayPause;
     private TextView nowPlayingTitle;
@@ -133,6 +140,8 @@ public class DashboardDialog extends SheetDialogFragment {
                 .getSharedPreferences(Entry.RECENT_APPS);
         this.mediaAppsPreferences = activity.getApplicationContext()
                 .getSharedPreferences(Entry.DASHBOARD_MEDIA_APPS);
+        this.recentMediaPreferences = activity.getApplicationContext()
+                .getSharedPreferences(Entry.RECENT_MEDIA);
         this.mediaSessionManager = (MediaSessionManager)
                 activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
     }
@@ -268,6 +277,15 @@ public class DashboardDialog extends SheetDialogFragment {
             }
         });
 
+        historySection = page.findViewById(R.id.history_section);
+        RecyclerView recyclerMediaHistory = page.findViewById(R.id.recycler_media_history);
+
+        recyclerMediaHistory.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.VERTICAL, false));
+
+        mediaHistoryAdapter = new RecentMediaAdapter(activity, new ArrayList<>());
+        recyclerMediaHistory.setAdapter(mediaHistoryAdapter);
+
         RecyclerView recyclerMediaApps = page.findViewById(R.id.recycler_media_apps);
         recyclerMediaApps.setLayoutManager(new LinearLayoutManager(activity,
                 LinearLayoutManager.HORIZONTAL, false));
@@ -331,6 +349,7 @@ public class DashboardDialog extends SheetDialogFragment {
 
         updateNowPlaying();
         refreshMediaApps();
+        refreshMediaHistory();
 
         if (favoritesAdapter == null || recentAdapter == null) {
             return;
@@ -355,6 +374,29 @@ public class DashboardDialog extends SheetDialogFragment {
         }
 
         mediaAppsAdapter.setPackages(filterInstalled(DashboardMediaApps.getPackages(mediaAppsPreferences)));
+    }
+
+    /**
+     * "Escuchado recientemente" - the actual listening-history summary
+     * the Multimedia tab was missing (see RecentMedia, fed from Media's
+     * own live session tracking). Entries whose app was since uninstalled
+     * are dropped the same way Favoritos/Recientes already are.
+     */
+    private void refreshMediaHistory() {
+        if (mediaHistoryAdapter == null || historySection == null) {
+            return;
+        }
+
+        List<RecentMedia.Track> tracks = new ArrayList<>();
+
+        for (RecentMedia.Track track : RecentMedia.getTracks(recentMediaPreferences)) {
+            if (ProfileManager.getInstance().getApplication(track.packageName) != null) {
+                tracks.add(track);
+            }
+        }
+
+        mediaHistoryAdapter.setTracks(tracks);
+        historySection.setVisibility(tracks.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     /**

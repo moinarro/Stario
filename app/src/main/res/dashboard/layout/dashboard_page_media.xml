@@ -113,6 +113,35 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/history_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:fontFamily="@font/dm_sans_medium"
+                android:letterSpacing="-0.03"
+                android:text="@string/dashboard_recent_media"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_media_history"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:orientation="vertical"
+                android:overScrollMode="never" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/media_apps_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

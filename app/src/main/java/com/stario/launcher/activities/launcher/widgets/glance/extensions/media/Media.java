@@ -63,6 +63,7 @@ import com.stario.launcher.BuildConfig;
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.GlanceDialogExtension;
 import com.stario.launcher.activities.launcher.widgets.glance.GlanceViewExtension;
+import com.stario.launcher.preferences.Entry;
 import com.stario.launcher.preferences.Vibrations;
 import com.stario.launcher.services.NotificationService;
 import com.stario.launcher.ui.common.glance.GlanceConstraintLayout;
@@ -516,6 +517,14 @@ public class Media extends GlanceDialogExtension {
 
         if (!title.contentEquals(lastSong)) {
             lastSong = title;
+
+            if (session != null) {
+                RecentMedia.record(activity.getApplicationContext()
+                                .getSharedPreferences(Entry.RECENT_MEDIA),
+                        session.getPackageName(), title,
+                        metadata.getString(MediaMetadata.METADATA_KEY_ARTIST));
+            }
+
             String finalTitle = title;
 
             song.animate().alpha(0)
