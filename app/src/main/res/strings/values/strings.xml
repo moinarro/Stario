@@ -181,6 +181,9 @@
     <string name="widget_stack_name">Stack name</string>
     <string name="rename">Rename</string>
     <string name="headlines_loading">Briefing</string>
+    <string name="battery_percentage">%1$d%%</string>
+    <string name="focus_access_title">Focus access</string>
+    <string name="focus_access_description">To toggle Do Not Disturb from here, Stario needs Do Not Disturb access. You can revoke it anytime from system settings.</string>
     <string name="widget_schedule">Schedule</string>
     <string name="widget_schedule_always_visible">Always visible</string>
     <string name="widget_schedule_unnamed">Unnamed profile</string>

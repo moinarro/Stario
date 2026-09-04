@@ -45,7 +45,9 @@ import com.stario.launcher.activities.launcher.widgets.SearchWidget;
 import com.stario.launcher.activities.launcher.widgets.glance.Glance;
 import com.stario.launcher.activities.launcher.widgets.glance.GlanceDialogExtension;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.battery.Battery;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.briefing.Headlines;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.focus.Focus;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.calendar.Calendar;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.media.Media;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.weather.Weather;
@@ -303,6 +305,8 @@ public class Launcher extends ThemedActivity {
         Calendar calendar = new Calendar();
         glance.attachViewExtension(calendar);
         glance.attachViewExtension(new Headlines());
+        glance.attachViewExtension(new Focus());
+        glance.attachViewExtension(new Battery());
         glance.attachDialogExtension(new Media(), listener);
         glance.attachDialogExtension(new Weather(), listener);
     }
