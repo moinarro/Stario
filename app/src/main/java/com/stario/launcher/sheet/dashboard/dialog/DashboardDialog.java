@@ -76,8 +76,11 @@ import java.util.List;
  * PagerAdapter - see DashboardPagerAdapter):
  * <ul>
  *     <li>Inicio: a DND toggle, "Favoritos" (GlanceQuickApps' curated
- *     list) and "Recientes" (RecentApps' launch history) - all sourced
- *     from lists that already exist elsewhere.</li>
+ *     list), "Apps más usadas" (UsageAccess, gated behind the special
+ *     Usage Access permission - see UsageAccessDialog) and "Recientes"
+ *     (RecentApps' launch history) - all sourced from data that already
+ *     exists elsewhere, except Usage Access itself which this tab is the
+ *     first (and so far only) place asking for it.</li>
  *     <li>Multimedia: a Now Playing card driven by the same
  *     MediaSessionManager/NotificationService approach the Glance Media
  *     chip already uses, an "Escuchado recientemente" listening history
@@ -95,6 +98,7 @@ public class DashboardDialog extends SheetDialogFragment {
     private SharedPreferences recentMediaPreferences;
     private DashboardAppAdapter favoritesAdapter;
     private DashboardAppAdapter recentAdapter;
+    private DashboardAppAdapter mostUsedAdapter;
     private DashboardAppAdapter mediaAppsAdapter;
     private RecentMediaAdapter mediaHistoryAdapter;
     private MediaSessionManager mediaSessionManager;
@@ -103,6 +107,9 @@ public class DashboardDialog extends SheetDialogFragment {
     private ViewGroup placeholder;
     private View favoritesSection;
     private View recentSection;
+    private View mostUsedSection;
+    private View usageAccessPrompt;
+    private RecyclerView recyclerMostUsed;
     private View nowPlayingCard;
     private View historySection;
     private ImageView nowPlayingCover;
@@ -200,6 +207,15 @@ public class DashboardDialog extends SheetDialogFragment {
         placeholder = page.findViewById(R.id.placeholder);
         favoritesSection = page.findViewById(R.id.favorites_section);
         recentSection = page.findViewById(R.id.recent_section);
+        mostUsedSection = page.findViewById(R.id.most_used_section);
+        usageAccessPrompt = page.findViewById(R.id.usage_access_prompt);
+        recyclerMostUsed = page.findViewById(R.id.recycler_most_used);
+
+        usageAccessPrompt.setOnClickListener(v -> {
+            Vibrations.getInstance().vibrate();
+
+            new UsageAccessDialog(activity).show();
+        });
 
         // Reuses the same Glance chip rather than inventing a second status
         // display - a quick DND toggle right where the user is already
@@ -231,9 +247,14 @@ public class DashboardDialog extends SheetDialogFragment {
 
         favoritesAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
         recentAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
+        mostUsedAdapter = new DashboardAppAdapter(activity, new ArrayList<>(), launchListener);
 
         recyclerFavorites.setAdapter(favoritesAdapter);
         recyclerRecent.setAdapter(recentAdapter);
+
+        recyclerMostUsed.setLayoutManager(new LinearLayoutManager(activity,
+                LinearLayoutManager.HORIZONTAL, false));
+        recyclerMostUsed.setAdapter(mostUsedAdapter);
     }
 
     private void setupMediaPage(View page) {
@@ -366,6 +387,36 @@ public class DashboardDialog extends SheetDialogFragment {
 
         placeholder.setVisibility(favorites.isEmpty() && recent.isEmpty() ?
                 View.VISIBLE : View.GONE);
+
+        refreshMostUsed();
+    }
+
+    /**
+     * "Apps más usadas" - needs the special Usage Access permission,
+     * which isn't requested through the normal runtime dialog, so this
+     * section doubles as its own onboarding: a short prompt row when
+     * access hasn't been granted yet (tap -> UsageAccessDialog), the
+     * actual ranked list once it has.
+     */
+    private void refreshMostUsed() {
+        if (mostUsedAdapter == null) {
+            return;
+        }
+
+        if (!UsageAccess.isGranted(activity)) {
+            usageAccessPrompt.setVisibility(View.VISIBLE);
+            recyclerMostUsed.setVisibility(View.GONE);
+            mostUsedSection.setVisibility(View.VISIBLE);
+
+            return;
+        }
+
+        List<String> mostUsed = filterInstalled(UsageAccess.getMostUsed(activity, 8));
+        mostUsedAdapter.setPackages(mostUsed);
+
+        usageAccessPrompt.setVisibility(View.GONE);
+        recyclerMostUsed.setVisibility(mostUsed.isEmpty() ? View.GONE : View.VISIBLE);
+        mostUsedSection.setVisibility(mostUsed.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private void refreshMediaApps() {

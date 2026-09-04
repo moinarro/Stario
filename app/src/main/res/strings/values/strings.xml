@@ -191,6 +191,10 @@
     <string name="dashboard_media_apps">Apps multimedia</string>
     <string name="dashboard_media_empty">Nothing playing, and no apps added yet. Tap + to add Spotify, YouTube, or any media app.</string>
     <string name="dashboard_recent_media">Escuchado recientemente</string>
+    <string name="dashboard_most_used">Apps más usadas</string>
+    <string name="dashboard_usage_access_prompt">Activar acceso de uso para ver tus apps más usadas</string>
+    <string name="usage_access_title">Acceso de uso</string>
+    <string name="usage_access_description">Para mostrarte tus apps más usadas, Stario necesita el permiso de acceso de uso, una pantalla separada del sistema Android. No se comparte ni se envía a ningún sitio - se usa solo aquí, en el Dashboard.</string>
     <string name="focus_access_title">Focus access</string>
     <string name="focus_access_description">To toggle Do Not Disturb from here, Stario needs Do Not Disturb access. You can revoke it anytime from system settings.</string>
     <string name="widget_schedule">Schedule</string>
