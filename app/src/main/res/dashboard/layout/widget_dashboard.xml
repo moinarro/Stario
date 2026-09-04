@@ -49,6 +49,16 @@
                 android:paddingEnd="20dp">
 
                 <LinearLayout
+                    android:id="@+id/status_row"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/background_medium_corners"
+                    android:clipToOutline="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
                     android:id="@+id/placeholder"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

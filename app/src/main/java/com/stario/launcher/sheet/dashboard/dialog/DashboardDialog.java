@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,6 +32,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.stario.launcher.R;
 import com.stario.launcher.activities.launcher.widgets.glance.extensions.apps.GlanceQuickApps;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.battery.Battery;
+import com.stario.launcher.activities.launcher.widgets.glance.extensions.focus.Focus;
 import com.stario.launcher.apps.LauncherApplication;
 import com.stario.launcher.apps.ProfileManager;
 import com.stario.launcher.apps.RecentApps;
@@ -65,6 +68,8 @@ public class DashboardDialog extends SheetDialogFragment {
     private ViewGroup placeholder;
     private View favoritesSection;
     private View recentSection;
+    private Battery battery;
+    private Focus focus;
     private View root;
 
     public DashboardDialog() {
@@ -106,6 +111,21 @@ public class DashboardDialog extends SheetDialogFragment {
         placeholder = root.findViewById(R.id.placeholder);
         favoritesSection = root.findViewById(R.id.favorites_section);
         recentSection = root.findViewById(R.id.recent_section);
+
+        // Reuses the same Glance chips rather than inventing a second status
+        // display - a quick DND toggle and battery read, right where the
+        // user is already looking for "what's going on right now".
+        LinearLayout statusRow = root.findViewById(R.id.status_row);
+
+        battery = new Battery();
+        View batteryView = battery.inflate(activity, statusRow);
+        batteryView.setOnClickListener(battery.getClickListener());
+        statusRow.addView(batteryView);
+
+        focus = new Focus();
+        View focusView = focus.inflate(activity, statusRow);
+        focusView.setOnClickListener(focus.getClickListener());
+        statusRow.addView(focusView);
 
         RecyclerView recyclerFavorites = root.findViewById(R.id.recycler_favorites);
         RecyclerView recyclerRecent = root.findViewById(R.id.recycler_recent);
@@ -167,6 +187,14 @@ public class DashboardDialog extends SheetDialogFragment {
      * back on screen rather than only once in onCreateView().
      */
     private void refresh() {
+        if (battery != null) {
+            battery.update();
+        }
+
+        if (focus != null) {
+            focus.update();
+        }
+
         if (favoritesAdapter == null || recentAdapter == null) {
             return;
         }

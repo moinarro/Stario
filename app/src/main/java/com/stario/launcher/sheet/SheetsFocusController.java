@@ -168,7 +168,24 @@ public class SheetsFocusController extends ConstraintLayout {
 
         if (action == MotionEvent.ACTION_UP ||
                 action == MotionEvent.ACTION_CANCEL) {
-            dispatchSheetMotionEvent(MotionEvent.obtain(ev));
+            // TOP_SHEET is special-cased: dragging down peeks at whatever is
+            // registered there (the Dashboard), but letting go always hands
+            // off to the real system notification shade instead of settling
+            // into an open sheet - the one-finger swipe down keeps behaving
+            // like it always did, and the peek is purely a preview.
+            if (sheetType == SheetType.TOP_SHEET) {
+                SheetWrapper topWrapper = wrappers[SheetType.TOP_SHEET.ordinal()];
+
+                if (topWrapper != null && topWrapper.dialogFragment.isAdded()) {
+                    topWrapper.dialogFragment.hide(true);
+                }
+
+                if (action == MotionEvent.ACTION_UP) {
+                    UiUtils.expandStatusBar(getContext());
+                }
+            } else {
+                dispatchSheetMotionEvent(MotionEvent.obtain(ev));
+            }
 
             removeCheck();
 
