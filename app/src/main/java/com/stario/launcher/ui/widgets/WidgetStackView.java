@@ -67,14 +67,18 @@ public class WidgetStackView extends FrameLayout {
 
     private final List<Integer> children;
     private final Callback callback;
-    private final ChildAdapter adapter;
-    private final TextView nameView;
-    private final TextView pageIndicator;
-    private final LinearLayout dots;
-    private final RecyclerView recycler;
-    private final LinearLayoutManager layoutManager;
-    private final PagerSnapHelper snapHelper;
-    private final TwoFingerSwipeGestureDetector twoFingerDetector;
+    private ChildAdapter adapter;
+    private TextView nameView;
+    private TextView pageIndicator;
+    private LinearLayout dots;
+    private RecyclerView recycler;
+    private LinearLayoutManager layoutManager;
+    private PagerSnapHelper snapHelper;
+    private TwoFingerSwipeGestureDetector twoFingerDetector;
+    private boolean contentAttached;
+    private String pendingName;
+    private OnLongClickListener pendingHeaderListener;
+    private boolean pendingHeaderListenerSet;
 
     public WidgetStackView(Context context, List<Integer> children, Callback callback) {
         super(context);
@@ -82,13 +86,33 @@ public class WidgetStackView extends FrameLayout {
         this.children = children;
         this.callback = callback;
 
-        // WidgetContainer (this view's eventual parent) is a RelativeLayout,
-        // so its onMeasure() casts the child's LayoutParams to
-        // RelativeLayout.LayoutParams. That LayoutParams object is handed
-        // to WidgetContainer.addView() instead of being set here directly:
-        // calling View.setLayoutParams() on a view that has no parent yet
-        // crashes with a NullPointerException in ViewGroup.resolveLayoutParams()
-        // -- see WidgetContainer's addView(host, ...) call.
+        // Adding a ViewGroup that already has real child views (this one's
+        // recycler/dots/name header, once inflated) to a fresh parent
+        // crashes with a NullPointerException in
+        // ViewGroup.resolveLayoutParams() on some newer Android versions -
+        // a plain AppWidgetHostView never hits this because its actual
+        // remote-view content only arrives asynchronously after it's
+        // already attached. Mirror that here: stay a completely empty
+        // FrameLayout until this view is itself attached to a window (i.e.
+        // until WidgetContainer.addView(this) has already safely returned),
+        // then build the real content in attachContent().
+        post(this::attachContent);
+    }
+
+    /**
+     * Builds the actual stack content - deferred out of the constructor,
+     * see the comment there. Safe to call only once this view is already
+     * attached to its parent.
+     */
+    private void attachContent() {
+        if (contentAttached) {
+            return;
+        }
+
+        contentAttached = true;
+
+        Context context = getContext();
+
         View root = LayoutInflater.from(context)
                 .inflate(R.layout.widget_stack_container, this, true);
 
@@ -198,7 +222,16 @@ public class WidgetStackView extends FrameLayout {
             }
         });
 
-        setOnHeaderLongClickListener(null);
+        if (pendingHeaderListenerSet) {
+            setOnHeaderLongClickListener(pendingHeaderListener);
+        } else {
+            setOnHeaderLongClickListener(null);
+        }
+
+        if (pendingName != null) {
+            setName(pendingName);
+        }
+
         updatePageIndicator();
     }
 
@@ -218,6 +251,16 @@ public class WidgetStackView extends FrameLayout {
     }
 
     public void setOnHeaderLongClickListener(OnLongClickListener listener) {
+        // Called by WidgetsDialog right after construction, before
+        // attachContent() (deferred via post()) has necessarily run yet -
+        // stash it and apply once the header view actually exists.
+        if (!contentAttached) {
+            pendingHeaderListener = listener;
+            pendingHeaderListenerSet = true;
+
+            return;
+        }
+
         View header = findViewById(R.id.header);
 
         header.setLongClickable(listener != null);
@@ -230,6 +273,14 @@ public class WidgetStackView extends FrameLayout {
      * width, matching a stack that was never renamed.
      */
     public void setName(@Nullable String name) {
+        // Same reasoning as setOnHeaderLongClickListener(): may be called
+        // before attachContent() has built nameView yet.
+        if (!contentAttached) {
+            pendingName = name;
+
+            return;
+        }
+
         if (TextUtils.isEmpty(name)) {
             nameView.setVisibility(GONE);
             nameView.setText(null);
