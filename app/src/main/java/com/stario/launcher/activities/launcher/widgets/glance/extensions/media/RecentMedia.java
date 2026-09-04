@@ -33,12 +33,15 @@ import java.util.Objects;
 
 /**
  * A small "what I've been listening to" history - most recent track
- * first, capped at {@link #MAX_ENTRIES}. Fed as a side effect of Media's
- * own live MediaController tracking (see Media.updateSession(), the same
- * place lastSong/lastArtist already get updated) rather than a separate
- * listener of its own - the exact same "no separate start-tracking step"
- * reasoning as RecentApps, just keyed off song changes instead of app
- * launches.
+ * first, capped at {@link #MAX_ENTRIES}. Fed as a side effect of two
+ * independent, already-existing MediaController trackers rather than a
+ * listener of its own: Media.updateSession() (only runs while the Glance
+ * Media chip is enabled) and DashboardDialog.updateNowPlaying() (runs any
+ * time the Dashboard's Multimedia tab is open, regardless of that Glance
+ * toggle - the reliable source, since a user who never enabled the chip
+ * would otherwise see no history at all). Both call record(), which
+ * dedupes against the current front entry, so neither produces
+ * duplicates on its own.
  */
 public final class RecentMedia {
     private static final String TAG = "RecentMedia";

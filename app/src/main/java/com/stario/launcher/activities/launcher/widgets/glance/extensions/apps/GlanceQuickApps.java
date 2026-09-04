@@ -295,12 +295,27 @@ public class GlanceQuickApps {
         if (infinite) {
             // Wraps around indefinitely (the adapter reports Integer.MAX_VALUE
             // items and maps position -> real index via modulo), so start
-            // roughly in the middle, aligned to both a row boundary and a full
-            // loop of the real list, to allow scrolling freely in either
-            // direction without ever hitting an edge.
+            // some way in, aligned to both a row boundary and a full loop of
+            // the real list, to allow scrolling freely in either direction
+            // without ever hitting an edge.
+            //
+            // Deliberately NOT anywhere near Integer.MAX_VALUE/2, despite the
+            // adapter itself reporting that many items: GridLayoutManager's
+            // internal offset/anchor math multiplies the position by an
+            // estimated item size while laying out, and with a multi-row
+            // (rows > 1) grid and a starting index in the hundreds of
+            // millions that calculation silently overflows int range,
+            // producing corrupted offsets - seen as the icons flickering/
+            // jumping right after the popup opens, until a touch forces
+            // RecyclerView onto its relative (delta-based, overflow-free)
+            // scroll path instead. A few hundred loops of the real list is
+            // still far more than anyone will ever scroll through, while
+            // keeping the starting index small enough that the offset math
+            // stays well inside int range.
             long block = (long) rows * packages.size();
-            long middle = Integer.MAX_VALUE / 2L;
-            int startPosition = (int) ((middle / block) * block);
+            long startPositionLong = block * 200;
+            int startPosition = startPositionLong <= Integer.MAX_VALUE ?
+                    (int) startPositionLong : (int) block;
 
             manager.scrollToPosition(startPosition);
 

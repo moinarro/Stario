@@ -535,6 +535,17 @@ public class DashboardDialog extends SheetDialogFragment {
         nowPlayingPlayPause.setImageResource(isPlaying ?
                 R.drawable.ic_media_pause : R.drawable.ic_media_play);
 
+        // The reliable source for "Escuchado recientemente": Media's own
+        // recording (see Media.updateSession()) only runs while the Glance
+        // Media chip itself is enabled, but this card's own tracking here
+        // runs any time the Dashboard is open regardless of that toggle -
+        // RecentMedia.record() already dedupes against the current front
+        // entry, so both sources can feed it without producing duplicates.
+        if (isPlaying && title != null && !title.isEmpty()) {
+            RecentMedia.record(recentMediaPreferences, candidate.getPackageName(),
+                    title.trim(), artist);
+        }
+
         updateCover(metadata);
 
         nowPlayingCard.setVisibility(View.VISIBLE);
