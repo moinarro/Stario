@@ -39,6 +39,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.color.MaterialColors;
 import com.stario.launcher.R;
+import com.stario.launcher.gestures.TwoFingerSwipeGestureDetector;
+import com.stario.launcher.preferences.Vibrations;
 import com.stario.launcher.ui.Measurements;
 
 import java.util.List;
@@ -71,6 +73,7 @@ public class WidgetStackView extends FrameLayout {
     private final RecyclerView recycler;
     private final LinearLayoutManager layoutManager;
     private final PagerSnapHelper snapHelper;
+    private final TwoFingerSwipeGestureDetector twoFingerDetector;
 
     public WidgetStackView(Context context, List<Integer> children, Callback callback) {
         super(context);
@@ -112,9 +115,55 @@ public class WidgetStackView extends FrameLayout {
         // the sheet's close gesture only once there is no more previous/next
         // widget to scroll to.
         recycler.setNestedScrollingEnabled(true);
+
+        // A two-finger swipe anywhere on the stack jumps straight to the
+        // first/last widget - independent of (and on top of) the regular
+        // single-finger paging. It's a fresh detector scoped to just this
+        // recycler rather than the launcher's global one (Launcher.java),
+        // since the widgets sheet is its own Dialog window and never sees
+        // that instance's touch feed at all.
+        twoFingerDetector = new TwoFingerSwipeGestureDetector(context);
+        twoFingerDetector.setOnSwipeListener(new TwoFingerSwipeGestureDetector.OnSwipeListener() {
+            @Override
+            public void onGestureArmed() {
+                // No extra bookkeeping needed: once this listener's
+                // onInterceptTouchEvent below returns true for the
+                // triggering ACTION_POINTER_DOWN, RecyclerView cancels
+                // whatever single-finger drag it had already started.
+            }
+
+            @Override
+            public void onSwipe(TwoFingerSwipeGestureDetector.Direction direction) {
+                if (direction == TwoFingerSwipeGestureDetector.Direction.LEFT) {
+                    Vibrations.getInstance().vibrate();
+
+                    scrollToPage(children.size() - 1);
+                } else if (direction == TwoFingerSwipeGestureDetector.Direction.RIGHT) {
+                    Vibrations.getInstance().vibrate();
+
+                    scrollToPage(0);
+                }
+            }
+
+            @Override
+            public void onGestureFinished() {
+            }
+        });
+
         recycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
             @Override
             public boolean onInterceptTouchEvent(@NonNull RecyclerView view, @NonNull MotionEvent event) {
+                return handle(view, event);
+            }
+
+            @Override
+            public void onTouchEvent(@NonNull RecyclerView view, @NonNull MotionEvent event) {
+                handle(view, event);
+            }
+
+            private boolean handle(RecyclerView view, MotionEvent event) {
+                boolean twoFingerOwnsGesture = twoFingerDetector.onTouchEvent(event);
+
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         ViewParent parent = view.getParent();
@@ -133,7 +182,7 @@ public class WidgetStackView extends FrameLayout {
                         break;
                 }
 
-                return false;
+                return twoFingerOwnsGesture;
             }
         });
 
