@@ -20,8 +20,10 @@ package com.stario.launcher.ui.widgets;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -80,6 +82,43 @@ public class WidgetStackView extends FrameLayout {
                 LinearLayoutManager.HORIZONTAL, false);
         recycler.setLayoutManager(manager);
         recycler.setItemAnimator(null);
+
+        // The stack lives inside the widgets sheet, which is itself
+        // dismissed by a horizontal swipe (RightSheetBehavior). That sheet
+        // decides whether to treat a horizontal drag as "close me" from the
+        // raw touch stream, before this recycler ever sees the event - so
+        // without this, swiping to the previous/next widget at the very
+        // start of the gesture gets stolen and closes the sheet instead of
+        // paging the stack. Claiming the touch stream up front lets the
+        // recycler's own (already boundary-aware) nested-scroll dispatch
+        // negotiate with the sheet instead, which correctly hands off to
+        // the sheet's close gesture only once there is no more previous/next
+        // widget to scroll to.
+        recycler.setNestedScrollingEnabled(true);
+        recycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView view, @NonNull MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        ViewParent parent = view.getParent();
+
+                        if (parent != null) {
+                            parent.requestDisallowInterceptTouchEvent(true);
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        ViewParent releasedParent = view.getParent();
+
+                        if (releasedParent != null) {
+                            releasedParent.requestDisallowInterceptTouchEvent(false);
+                        }
+                        break;
+                }
+
+                return false;
+            }
+        });
 
         new PagerSnapHelper().attachToRecyclerView(recycler);
 
