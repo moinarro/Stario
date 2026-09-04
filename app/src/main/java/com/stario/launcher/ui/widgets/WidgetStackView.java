@@ -23,6 +23,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.View.MeasureSpec;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -199,6 +200,21 @@ public class WidgetStackView extends FrameLayout {
 
         setOnHeaderLongClickListener(null);
         updatePageIndicator();
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // WidgetContainer hands this view whatever space it has available
+        // (WRAP_CONTENT-style AT_MOST specs, since it never gets explicit
+        // MATCH_PARENT LayoutParams - see WidgetContainer's addView(host)
+        // call), so claim all of it here instead of collapsing down to
+        // however small its own content would otherwise measure.
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int height = MeasureSpec.getSize(heightMeasureSpec);
+
+        super.onMeasure(
+                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
     }
 
     public void setOnHeaderLongClickListener(OnLongClickListener listener) {
