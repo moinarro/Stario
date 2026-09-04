@@ -253,7 +253,13 @@ public class GlanceQuickApps {
         recycler.setLayoutManager(manager);
         recycler.setItemAnimator(null);
 
-        if (scrollMode == ScrollMode.PAGINATION && infinite) {
+        // PagerSnapHelper's snap-distance calculation only accounts for a
+        // single span; with a multi-row GridLayoutManager (rows > 1) it
+        // fights the huge scrollToPosition() jump performed below, causing
+        // a corrective-scroll oscillation that reads as the icons
+        // flickering until the user's touch interrupts it. Snapping is
+        // only safe with a single row.
+        if (scrollMode == ScrollMode.PAGINATION && infinite && rows == 1) {
             new PagerSnapHelper().attachToRecyclerView(recycler);
         }
 
